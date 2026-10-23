@@ -24,6 +24,7 @@ const [cart, setCart] = useState<CartItem[]>([]);
 const [cashReceived, setCashReceived] = useState("");
 const [loading, setLoading] = useState(true);
 const [checkingOut, setCheckingOut] = useState(false);
+
 const [receipt, setReceipt] = useState<{
 orderNumber: number;
 total: number;
@@ -57,10 +58,14 @@ setLoading(false);
 }
 
 function addProduct(product: Product) {
+if (checkingOut) {
+return;
+}
+
 setCart((current) => {
-const existing = current.find(
-(item) => item.productId === product.id
-);
+  const existing = current.find(
+    (item) => item.productId === product.id
+  );
 
   if (existing) {
     return current.map((item) =>
@@ -87,36 +92,51 @@ const existing = current.find(
 }
 
 function increaseQuantity(productId: string) {
-setCart((current) =>
-current.map((item) =>
-item.productId === productId
-? {
-...item,
-quantity: item.quantity + 1,
+if (checkingOut) {
+return;
 }
-: item
-)
+
+setCart((current) =>
+  current.map((item) =>
+    item.productId === productId
+      ? {
+          ...item,
+          quantity: item.quantity + 1,
+        }
+      : item
+  )
 );
+
 }
 
 function decreaseQuantity(productId: string) {
-setCart((current) =>
-current
-.map((item) =>
-item.productId === productId
-? {
-...item,
-quantity: item.quantity - 1,
+if (checkingOut) {
+return;
 }
-: item
-)
-.filter((item) => item.quantity > 0)
+
+setCart((current) =>
+  current
+    .map((item) =>
+      item.productId === productId
+        ? {
+            ...item,
+            quantity: item.quantity - 1,
+          }
+        : item
+    )
+    .filter((item) => item.quantity > 0)
 );
+
 }
 
 function clearCart() {
+if (checkingOut) {
+return;
+}
+
 setCart([]);
 setCashReceived("");
+
 }
 
 const total = cart.reduce(
@@ -128,9 +148,13 @@ const cash = Number(cashReceived) || 0;
 const change = cash - total;
 
 async function checkout() {
-if (cart.length === 0) {
-alert("商品を選択してください。");
+if (checkingOut) {
 return;
+}
+
+if (cart.length === 0) {
+  alert("商品を選択してください。");
+  return;
 }
 
 if (cash < total) {
@@ -140,51 +164,55 @@ if (cash < total) {
 
 setCheckingOut(true);
 
-const { data: orderNumber, error: numberError } =
-  await supabase.rpc("next_order_number");
+try {
+  const { data: orderNumber, error: numberError } =
+    await supabase.rpc("next_order_number");
 
-if (numberError) {
-  console.error("整理番号取得エラー:", numberError);
-  alert("整理番号を取得できませんでした。");
-  setCheckingOut(false);
-  return;
-}
+  if (numberError) {
+    console.error("整理番号取得エラー:", numberError);
+    alert("整理番号を取得できませんでした。");
+    return;
+  }
 
-const items = cart.map((item) => ({
-  productId: item.productId,
-  name: item.name,
-  price: item.price,
-  quantity: item.quantity,
-}));
+  const items = cart.map((item) => ({
+    productId: item.productId,
+    name: item.name,
+    price: item.price,
+    quantity: item.quantity,
+  }));
 
-const { error: insertError } = await supabase
-  .from("orders")
-  .insert({
-    order_number: orderNumber,
-    total_price: total,
-    cash_received: cash,
-    change_amount: change,
-    status: "new",
-    items,
+  const { error: insertError } = await supabase
+    .from("orders")
+    .insert({
+      order_number: orderNumber,
+      total_price: total,
+      cash_received: cash,
+      change_amount: change,
+      status: "new",
+      items,
+    });
+
+  if (insertError) {
+    console.error("注文登録エラー:", insertError);
+    alert("注文を登録できませんでした。");
+    return;
+  }
+
+  setReceipt({
+    orderNumber,
+    total,
+    cashReceived: cash,
+    change,
   });
 
-if (insertError) {
-  console.error("注文登録エラー:", insertError);
-  alert("注文を登録できませんでした。");
+  setCart([]);
+  setCashReceived("");
+} catch (error) {
+  console.error("会計処理エラー:", error);
+  alert("会計処理中にエラーが発生しました。もう一度お試しください。");
+} finally {
   setCheckingOut(false);
-  return;
 }
-
-setReceipt({
-  orderNumber,
-  total,
-  cashReceived: cash,
-  change,
-});
-
-setCart([]);
-setCashReceived("");
-setCheckingOut(false);
 
 }
 
@@ -317,10 +345,12 @@ return (
                   key={product.id}
                   type="button"
                   onClick={() => addProduct(product)}
+                  disabled={checkingOut}
                   className={
                     "min-h-[170px] rounded-2xl border-2 bg-white p-6 text-left shadow-sm transition " +
                     "hover:border-blue-400 hover:shadow-md " +
                     "active:scale-[0.98] " +
+                    "disabled:cursor-not-allowed disabled:opacity-60 " +
                     (cartItem
                       ? "border-blue-500 ring-4 ring-blue-100"
                       : "border-slate-200")
@@ -372,7 +402,8 @@ return (
                 <button
                   type="button"
                   onClick={clearCart}
-                  className="rounded-xl bg-slate-700 px-4 py-3 text-sm font-black text-white hover:bg-slate-600"
+                  disabled={checkingOut}
+                  className="rounded-xl bg-slate-700 px-4 py-3 text-sm font-black text-white hover:bg-slate-600 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   クリア
                 </button>
@@ -416,7 +447,8 @@ return (
                               item.productId
                             )
                           }
-                          className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-200 text-2xl font-black text-slate-900 hover:bg-slate-300 active:scale-95"
+                          disabled={checkingOut}
+                          className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-200 text-2xl font-black text-slate-900 hover:bg-slate-300 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           −
                         </button>
@@ -432,7 +464,8 @@ return (
                               item.productId
                             )
                           }
-                          className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-900 text-2xl font-black text-white hover:bg-slate-800 active:scale-95"
+                          disabled={checkingOut}
+                          className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-900 text-2xl font-black text-white hover:bg-slate-800 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           ＋
                         </button>
@@ -472,8 +505,9 @@ return (
                 onChange={(event) =>
                   setCashReceived(event.target.value)
                 }
+                disabled={checkingOut}
                 placeholder="例：2000"
-                className="w-full rounded-2xl border-2 border-slate-300 bg-white px-5 py-5 text-2xl font-black text-slate-950 outline-none placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                className="w-full rounded-2xl border-2 border-slate-300 bg-white px-5 py-5 text-2xl font-black text-slate-950 outline-none placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 disabled:bg-slate-100"
               />
             </div>
 
@@ -499,10 +533,9 @@ return (
                   }
                 >
                   ¥
-                  {Math.max(
-                    0,
-                    change
-                  ).toLocaleString("ja-JP")}
+                  {Math.max(0, change).toLocaleString(
+                    "ja-JP"
+                  )}
                 </span>
               </div>
             </div>
