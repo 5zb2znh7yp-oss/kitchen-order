@@ -27,11 +27,18 @@ change_amount: number;
 status: OrderStatus;
 items: OrderItem[];
 created_at: string;
+staff_name: string | null;
 };
 
 type ProductSales = {
 name: string;
 quantity: number;
+sales: number;
+};
+
+type StaffSales = {
+name: string;
+orderCount: number;
 sales: number;
 };
 
@@ -121,7 +128,7 @@ setLoading(true);
 const { data, error } = await supabase
   .from("orders")
   .select(
-    "id, order_number, total_price, cash_received, change_amount, status, items, created_at"
+    "id, order_number, total_price, cash_received, change_amount, status, items, created_at, staff_name"
   )
   .order("created_at", { ascending: false });
 
@@ -188,6 +195,28 @@ sales: 0,
 });
 
 const productSales = Object.values(productSalesMap).sort(
+(a, b) => b.sales - a.sales
+);
+
+const staffSalesMap: Record<string, StaffSales> = {};
+
+validSelectedDateOrders.forEach((order) => {
+const staffName = order.staff_name?.trim() || "スタッフ未設定";
+
+if (!staffSalesMap[staffName]) {
+  staffSalesMap[staffName] = {
+    name: staffName,
+    orderCount: 0,
+    sales: 0,
+  };
+}
+
+staffSalesMap[staffName].orderCount += 1;
+staffSalesMap[staffName].sales += order.total_price;
+
+});
+
+const staffSales = Object.values(staffSalesMap).sort(
 (a, b) => b.sales - a.sales
 );
 
@@ -300,6 +329,49 @@ return (
     <div className="mb-6 overflow-hidden rounded-2xl bg-white shadow-sm">
       <div className="border-b border-slate-200 px-5 py-4">
         <h2 className="text-xl font-black text-slate-900">
+          スタッフ別売上
+        </h2>
+
+        <p className="mt-1 text-sm font-medium text-slate-600">
+          選択した日のスタッフ別の販売実績です。取消した注文は含まれていません。
+        </p>
+      </div>
+
+      {staffSales.length === 0 ? (
+        <div className="p-8 text-center">
+          <p className="font-bold text-slate-600">
+            この日のスタッフ別売上はありません
+          </p>
+        </div>
+      ) : (
+        <div className="divide-y divide-slate-200">
+          {staffSales.map((staff) => (
+            <div
+              key={staff.name}
+              className="flex items-center justify-between gap-4 px-5 py-4"
+            >
+              <div>
+                <p className="text-lg font-black text-slate-900">
+                  {staff.name}
+                </p>
+
+                <p className="mt-1 font-bold text-slate-600">
+                  注文件数 {staff.orderCount}件
+                </p>
+              </div>
+
+              <p className="text-xl font-black text-slate-900">
+                ¥{staff.sales.toLocaleString("ja-JP")}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+
+    <div className="mb-6 overflow-hidden rounded-2xl bg-white shadow-sm">
+      <div className="border-b border-slate-200 px-5 py-4">
+        <h2 className="text-xl font-black text-slate-900">
           商品別売上
         </h2>
 
@@ -385,6 +457,16 @@ return (
 
                     <p className="text-lg font-black text-slate-800">
                       {formatTime(order.created_at)}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-sm font-bold text-slate-600">
+                      担当スタッフ
+                    </p>
+
+                    <p className="text-lg font-black text-slate-800">
+                      {order.staff_name || "未設定"}
                     </p>
                   </div>
 
