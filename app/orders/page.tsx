@@ -1,3 +1,4 @@
+```tsx
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
@@ -51,15 +52,38 @@ function statusClass(status: OrderStatus) {
 }
 
 function formatTime(dateString: string) {
-  return new Date(dateString).toLocaleTimeString("ja-JP", {
+  const timestamp = Date.parse(dateString);
+
+  if (Number.isNaN(timestamp)) {
+    return "--:--";
+  }
+
+  return new Intl.DateTimeFormat("ja-JP", {
     hour: "2-digit",
     minute: "2-digit",
-  });
+  }).format(timestamp);
+}
+
+function formatDateKey(dateString: string) {
+  const timestamp = Date.parse(dateString);
+
+  if (Number.isNaN(timestamp)) {
+    return "";
+  }
+
+  return new Intl.DateTimeFormat("ja-JP", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  })
+    .format(timestamp)
+    .replaceAll("/", "-");
 }
 
 export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [todayKey, setTodayKey] = useState("");
 
   const loadOrders = useCallback(async () => {
     const { data, error } = await supabase
@@ -80,20 +104,24 @@ export default function OrdersPage() {
   }, []);
 
   useEffect(() => {
+    const now = new Intl.DateTimeFormat("ja-JP", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    })
+      .format()
+      .replaceAll("/", "-");
+
+    setTodayKey(now);
+  }, []);
+
+  useEffect(() => {
     loadOrders();
   }, [loadOrders]);
 
-  const today = new Date();
-
-  const todayOrders = orders.filter((order) => {
-    const date = new Date(order.created_at);
-
-    return (
-      date.getFullYear() === today.getFullYear() &&
-      date.getMonth() === today.getMonth() &&
-      date.getDate() === today.getDate()
-    );
-  });
+  const todayOrders = orders.filter(
+    (order) => formatDateKey(order.created_at) === todayKey
+  );
 
   const todaySales = todayOrders.reduce(
     (sum, order) => sum + order.total_price,
@@ -290,3 +318,4 @@ export default function OrdersPage() {
     </main>
   );
 }
+```
