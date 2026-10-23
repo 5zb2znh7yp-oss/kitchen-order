@@ -1,8 +1,6 @@
-```tsx
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-
 import { supabase } from "@/lib/supabase";
 
 type OrderItem = {
@@ -35,6 +33,8 @@ function statusLabel(status: OrderStatus) {
       return "完成";
     case "completed":
       return "呼出済み";
+    default:
+      return status;
   }
 }
 
@@ -47,6 +47,8 @@ function statusClass(status: OrderStatus) {
     case "ready":
       return "bg-green-100 text-green-700";
     case "completed":
+      return "bg-slate-100 text-slate-700";
+    default:
       return "bg-slate-100 text-slate-700";
   }
 }
@@ -86,6 +88,8 @@ export default function OrdersPage() {
   const [todayKey, setTodayKey] = useState("");
 
   const loadOrders = useCallback(async () => {
+    setLoading(true);
+
     const { data, error } = await supabase
       .from("orders")
       .select(
@@ -104,15 +108,17 @@ export default function OrdersPage() {
   }, []);
 
   useEffect(() => {
-    const now = new Intl.DateTimeFormat("ja-JP", {
+    const now = new Date();
+
+    const key = new Intl.DateTimeFormat("ja-JP", {
       year: "numeric",
       month: "2-digit",
       day: "2-digit",
     })
-      .format()
+      .format(now)
       .replaceAll("/", "-");
 
-    setTodayKey(now);
+    setTodayKey(key);
   }, []);
 
   useEffect(() => {
@@ -203,17 +209,14 @@ export default function OrdersPage() {
                   className="p-5"
                 >
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                    <div className="flex items-start gap-5">
+                    <div className="flex flex-wrap items-start gap-5">
                       <div>
                         <p className="text-sm font-bold text-slate-600">
                           整理番号
                         </p>
 
                         <p className="text-3xl font-black text-slate-900">
-                          {String(order.order_number).padStart(
-                            3,
-                            "0"
-                          )}
+                          {String(order.order_number).padStart(3, "0")}
                         </p>
                       </div>
 
@@ -228,9 +231,10 @@ export default function OrdersPage() {
                       </div>
 
                       <span
-                        className={`rounded-full px-4 py-2 text-sm font-black ${statusClass(
-                          order.status
-                        )}`}
+                        className={
+                          "rounded-full px-4 py-2 text-sm font-black " +
+                          statusClass(order.status)
+                        }
                       >
                         {statusLabel(order.status)}
                       </span>
@@ -256,7 +260,7 @@ export default function OrdersPage() {
                       <div className="space-y-2">
                         {order.items.map((item, index) => (
                           <div
-                            key={`${order.id}-${index}`}
+                            key={order.id + "-" + index}
                             className="flex items-center justify-between"
                           >
                             <span className="font-bold text-slate-900">
@@ -318,4 +322,4 @@ export default function OrdersPage() {
     </main>
   );
 }
-```
+
