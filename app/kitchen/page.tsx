@@ -11,7 +11,7 @@ price: number;
 quantity: number;
 };
 
-type OrderStatus = "new" | "cooking" | "ready" | "completed";
+type OrderStatus = "new" | "cooking" | "ready" | "completed" | "cancelled";
 
 type Order = {
 id: string;
@@ -35,13 +35,11 @@ const [loading, setLoading] = useState(true);
 const [updatingId, setUpdatingId] = useState<string | null>(null);
 
 const loadOrders = useCallback(async () => {
-setLoading(true);
-
 const { data, error } = await supabase
-  .from("orders")
-  .select("id, order_number, total_price, items, status, created_at")
-  .in("status", ["new", "cooking", "ready"])
-  .order("created_at", { ascending: true });
+.from("orders")
+.select("id, order_number, total_price, items, status, created_at")
+.in("status", ["new", "cooking", "ready"])
+.order("created_at", { ascending: true });
 
 if (error) {
   console.error("厨房注文取得エラー:", error);
@@ -96,7 +94,6 @@ async function cancelOrder(order: Order) {
 const itemsText = order.items
 .map((item) => `${item.name} × ${item.quantity}`)
 .join("\n");
-
 
 const message =
   `注文番号 ${String(order.order_number).padStart(3, "0")}\n\n` +
