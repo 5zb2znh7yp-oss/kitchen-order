@@ -121,6 +121,7 @@ export default function OrdersPage() {
 const [orders, setOrders] = useState<Order[]>([]);
 const [loading, setLoading] = useState(true);
 const [selectedDate, setSelectedDate] = useState("");
+const [deletingOrderId, setDeletingOrderId] = useState<string | null>(null);
 
 const loadOrders = useCallback(async () => {
 setLoading(true);
@@ -150,6 +151,46 @@ setSelectedDate(getTodayKey());
 useEffect(() => {
 loadOrders();
 }, [loadOrders]);
+
+async function handleDeleteOrder(orderId: string) {
+const targetOrder = orders.find((order) => order.id === orderId);
+
+if (!targetOrder) {
+  return;
+}
+
+const confirmed = window.confirm(
+  `整理番号 ${String(targetOrder.order_number).padStart(
+    3,
+    "0"
+  )} の注文を履歴から削除しますか？\n\nこの操作は元に戻せません。`
+);
+
+if (!confirmed) {
+  return;
+}
+
+setDeletingOrderId(orderId);
+
+const { error } = await supabase
+  .from("orders")
+  .delete()
+  .eq("id", orderId);
+
+if (error) {
+  console.error("注文削除エラー:", error);
+  window.alert("注文の削除に失敗しました。");
+  setDeletingOrderId(null);
+  return;
+}
+
+setOrders((currentOrders) =>
+  currentOrders.filter((order) => order.id !== orderId)
+);
+
+setDeletingOrderId(null);
+
+}
 
 const selectedDateOrders = orders.filter(
 (order) => formatDateKey(order.created_at) === selectedDate
@@ -258,9 +299,7 @@ return (
         <input
           type="date"
           value={selectedDate}
-          onChange={(event) =>
-            setSelectedDate(event.target.value)
-          }
+          onChange={(event) => setSelectedDate(event.target.value)}
           className="rounded-xl border-2 border-slate-300 bg-white px-4 py-3 text-lg font-black text-slate-900 outline-none focus:border-slate-900"
         />
       </div>
@@ -480,14 +519,27 @@ return (
                   </span>
                 </div>
 
-                <div className="text-left lg:text-right">
-                  <p className="text-sm font-bold text-slate-600">
-                    合計
-                  </p>
+                <div className="flex flex-col items-start gap-3 lg:items-end">
+                  <div className="text-left lg:text-right">
+                    <p className="text-sm font-bold text-slate-600">
+                      合計
+                    </p>
 
-                  <p className="text-2xl font-black text-slate-900">
-                    ¥{order.total_price.toLocaleString("ja-JP")}
-                  </p>
+                    <p className="text-2xl font-black text-slate-900">
+                      ¥{order.total_price.toLocaleString("ja-JP")}
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteOrder(order.id)}
+                    disabled={deletingOrderId === order.id}
+                    className="rounded-xl bg-red-600 px-4 py-2 font-black text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-red-300"
+                  >
+                    {deletingOrderId === order.id
+                      ? "削除中..."
+                      : "この注文を削除"}
+                  </button>
                 </div>
               </div>
 
