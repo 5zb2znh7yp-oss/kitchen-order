@@ -3,41 +3,51 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const links = [
-  { href: "/", label: "注文入力" },
-  { href: "/kitchen", label: "厨房" },
-  { href: "/call", label: "呼出" },
-  { href: "/orders", label: "注文履歴" },
-  { href: "/products", label: "商品管理" },
+const navItems = [
+{ href: "/", label: "注文入力" },
+{ href: "/kitchen", label: "キッチン" },
+{ href: "/call", label: "呼出画面" },
+{ href: "/orders", label: "注文履歴・売上" },
+{ href: "/products", label: "商品管理" },
 ];
 
 export default function Navbar() {
-  const pathname = usePathname();
+const pathname = usePathname();
 
-  return (
-    <nav className="sticky top-0 z-50 border-b border-slate-700 bg-slate-950 px-3 py-3 shadow-lg">
-      <div className="mx-auto flex max-w-[1600px] flex-wrap gap-2">
-        {links.map((link) => {
+return (
+<nav className="sticky top-0 z-50 border-b border-slate-200 bg-white shadow-sm">
+<div className="mx-auto max-w-[1600px] px-3 py-3 md:px-6">
+<div className="flex items-center gap-3 overflow-x-auto">
+<Link href="/" className="mr-2 shrink-0 text-lg font-black text-slate-900 md:text-xl" >
+店舗システム
+</Link>
+
+      <div className="flex shrink-0 gap-2">
+        {navItems.map((item) => {
           const isActive =
-            pathname === link.href ||
-            (link.href !== "/" &&
-              pathname.startsWith(link.href));
+            item.href === "/"
+              ? pathname === "/"
+              : pathname.startsWith(item.href);
 
           return (
             <Link
-              key={link.href}
-              href={link.href}
-              className={`rounded-xl px-4 py-3 text-sm font-black transition md:px-5 md:text-base ${
-                isActive
-                  ? "bg-blue-600 text-white shadow-md"
-                  : "bg-slate-800 text-slate-200 hover:bg-slate-700 hover:text-white"
-              }`}
+              key={item.href}
+              href={item.href}
+              className={
+                "whitespace-nowrap rounded-xl px-4 py-2.5 text-sm font-black transition md:text-base " +
+                (isActive
+                  ? "bg-slate-900 text-white"
+                  : "bg-slate-100 text-slate-700 hover:bg-slate-200")
+              }
             >
-              {link.label}
+              {item.label}
             </Link>
           );
         })}
       </div>
-    </nav>
-  );
+    </div>
+  </div>
+</nav>
+
+);
 }
