@@ -35,11 +35,13 @@ const [loading, setLoading] = useState(true);
 const [updatingId, setUpdatingId] = useState<string | null>(null);
 
 const loadOrders = useCallback(async () => {
+setLoading(true);
+
 const { data, error } = await supabase
-.from("orders")
-.select("id, order_number, total_price, items, status, created_at")
-.in("status", ["new", "cooking", "ready"])
-.order("created_at", { ascending: true });
+  .from("orders")
+  .select("id, order_number, total_price, items, status, created_at")
+  .in("status", ["new", "cooking", "ready"])
+  .order("created_at", { ascending: true });
 
 if (error) {
   console.error("厨房注文取得エラー:", error);
@@ -90,23 +92,33 @@ setUpdatingId(null);
 
 }
 
-async function cancelOrder(orderId: string) {
-const confirmed = window.confirm(
-"この注文を取り消しますか？\n\n取り消した注文は注文履歴には残りますが、売上には含まれません。"
-);
+async function cancelOrder(order: Order) {
+const itemsText = order.items
+.map((item) => `${item.name} × ${item.quantity}`)
+.join("\n");
+
+
+const message =
+  `注文番号 ${String(order.order_number).padStart(3, "0")}\n\n` +
+  `${itemsText}\n\n` +
+  `合計 ¥${order.total_price.toLocaleString("ja-JP")}\n\n` +
+  `この注文を取り消しますか？\n\n` +
+  `取り消した注文は注文履歴には残りますが、売上には含まれません。`;
+
+const confirmed = window.confirm(message);
 
 if (!confirmed) {
   return;
 }
 
-setUpdatingId(orderId);
+setUpdatingId(order.id);
 
 const { error } = await supabase
   .from("orders")
   .update({
     status: "cancelled",
   })
-  .eq("id", orderId);
+  .eq("id", order.id);
 
 if (error) {
   console.error("注文取消しエラー:", error);
@@ -116,7 +128,9 @@ if (error) {
 }
 
 setOrders((currentOrders) =>
-  currentOrders.filter((order) => order.id !== orderId)
+  currentOrders.filter(
+    (currentOrder) => currentOrder.id !== order.id
+  )
 );
 
 setUpdatingId(null);
@@ -261,7 +275,7 @@ onUpdate: (
 orderId: string,
 nextStatus: "cooking" | "ready" | "completed"
 ) => void;
-onCancel: (orderId: string) => void;
+onCancel: (order: Order) => void;
 }) {
 return (
 <section className="overflow-hidden rounded-3xl bg-white shadow-sm">
@@ -338,7 +352,7 @@ onUpdate: (
 orderId: string,
 nextStatus: "cooking" | "ready" | "completed"
 ) => void;
-onCancel: (orderId: string) => void;
+onCancel: (order: Order) => void;
 }) {
 return (
 <div className="rounded-3xl border-2 border-slate-200 bg-white p-5 shadow-sm">
@@ -415,7 +429,7 @@ return (
 
   <button
     type="button"
-    onClick={() => onCancel(order.id)}
+    onClick={() => onCancel(order)}
     disabled={updatingId === order.id}
     className="mt-3 w-full rounded-2xl border-2 border-red-300 bg-white py-3 text-lg font-black text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
   >

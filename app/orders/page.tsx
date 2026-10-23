@@ -151,10 +151,19 @@ const validTodayOrders = todayOrders.filter(
 (order) => order.status !== "cancelled"
 );
 
+const cancelledTodayOrders = todayOrders.filter(
+(order) => order.status === "cancelled"
+);
+
 const todaySales = validTodayOrders.reduce(
 (sum, order) => sum + order.total_price,
 0
 );
+
+const averageOrderValue =
+validTodayOrders.length > 0
+? Math.round(todaySales / validTodayOrders.length)
+: 0;
 
 const productSalesMap: Record<string, ProductSales> = {};
 
@@ -187,10 +196,11 @@ return (
 <h1 className="text-3xl font-black text-slate-900 md:text-4xl">
 注文履歴・売上
 </h1>
-<p className="mt-1 font-medium text-slate-700">
-これまでの注文と売上を確認できます。
-</p>
-</div>
+
+        <p className="mt-1 font-medium text-slate-700">
+          これまでの注文と売上を確認できます。
+        </p>
+      </div>
 
       <button
         type="button"
@@ -201,7 +211,7 @@ return (
       </button>
     </header>
 
-    <div className="mb-6 grid gap-4 md:grid-cols-2">
+    <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <div className="rounded-2xl bg-white p-6 shadow-sm">
         <p className="font-bold text-slate-600">
           本日の注文数
@@ -212,11 +222,9 @@ return (
           <span className="ml-2 text-xl">件</span>
         </p>
 
-        {todayOrders.length !== validTodayOrders.length && (
-          <p className="mt-2 font-bold text-red-600">
-            取消 {todayOrders.length - validTodayOrders.length}件
-          </p>
-        )}
+        <p className="mt-2 text-sm font-bold text-slate-500">
+          取消を除く
+        </p>
       </div>
 
       <div className="rounded-2xl bg-white p-6 shadow-sm">
@@ -227,6 +235,39 @@ return (
         <p className="mt-2 text-4xl font-black text-slate-900">
           ¥{todaySales.toLocaleString("ja-JP")}
         </p>
+
+        <p className="mt-2 text-sm font-bold text-slate-500">
+          取消を除く
+        </p>
+      </div>
+
+      <div className="rounded-2xl bg-white p-6 shadow-sm">
+        <p className="font-bold text-slate-600">
+          平均客単価
+        </p>
+
+        <p className="mt-2 text-4xl font-black text-slate-900">
+          ¥{averageOrderValue.toLocaleString("ja-JP")}
+        </p>
+
+        <p className="mt-2 text-sm font-bold text-slate-500">
+          1注文あたり
+        </p>
+      </div>
+
+      <div className="rounded-2xl bg-white p-6 shadow-sm">
+        <p className="font-bold text-slate-600">
+          取消件数
+        </p>
+
+        <p className="mt-2 text-4xl font-black text-red-600">
+          {cancelledTodayOrders.length}
+          <span className="ml-2 text-xl">件</span>
+        </p>
+
+        <p className="mt-2 text-sm font-bold text-slate-500">
+          売上には含まれません
+        </p>
       </div>
     </div>
 
@@ -235,6 +276,7 @@ return (
         <h2 className="text-xl font-black text-slate-900">
           商品別売上
         </h2>
+
         <p className="mt-1 text-sm font-medium text-slate-600">
           本日の販売実績です。取消した注文は含まれていません。
         </p>
@@ -257,6 +299,7 @@ return (
                 <p className="text-lg font-black text-slate-900">
                   {product.name}
                 </p>
+
                 <p className="mt-1 font-bold text-slate-600">
                   販売数 {product.quantity}個
                 </p>
