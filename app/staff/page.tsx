@@ -22,11 +22,18 @@ const router = useRouter();
 const [staff, setStaff] = useState<Staff[]>([]);
 const [loggedInStaff, setLoggedInStaff] =
 useState<LoggedInStaff | null>(null);
+
 const [selectedStaffId, setSelectedStaffId] = useState("");
 const [displayName, setDisplayName] = useState("");
+
+const [editingStaffId, setEditingStaffId] = useState("");
+const [editingName, setEditingName] = useState("");
+
 const [loading, setLoading] = useState(true);
 const [saving, setSaving] = useState(false);
 const [switching, setSwitching] = useState(false);
+const [updating, setUpdating] = useState(false);
+
 const [message, setMessage] = useState("");
 const [errorMessage, setErrorMessage] = useState("");
 
@@ -124,6 +131,74 @@ setMessage("スタッフを登録しました。");
 
 await loadStaff();
 setSaving(false);
+
+}
+
+function startEditingStaff(person: Staff) {
+setEditingStaffId(person.id);
+setEditingName(person.display_name);
+setMessage("");
+setErrorMessage("");
+}
+
+function cancelEditingStaff() {
+setEditingStaffId("");
+setEditingName("");
+}
+
+async function handleUpdateStaffName(staffId: string) {
+const trimmedName = editingName.trim();
+
+if (!trimmedName) {
+  setErrorMessage("スタッフ名を入力してください。");
+  return;
+}
+
+setUpdating(true);
+setMessage("");
+setErrorMessage("");
+
+const { error } = await supabase
+  .from("staff_profiles")
+  .update({
+    display_name: trimmedName,
+  })
+  .eq("id", staffId);
+
+if (error) {
+  console.error("スタッフ名変更エラー:", error);
+
+  if (error.code === "23505") {
+    setErrorMessage("同じ名前のスタッフがすでに登録されています。");
+  } else {
+    setErrorMessage("スタッフ名の変更に失敗しました。");
+  }
+
+  setUpdating(false);
+  return;
+}
+
+if (loggedInStaff?.id === staffId) {
+  const updatedLoggedInStaff = {
+    id: staffId,
+    displayName: trimmedName,
+  };
+
+  localStorage.setItem(
+    "kitchen-order-staff",
+    JSON.stringify(updatedLoggedInStaff)
+  );
+
+  setLoggedInStaff(updatedLoggedInStaff);
+}
+
+setEditingStaffId("");
+setEditingName("");
+setMessage("スタッフ名を変更しました。");
+
+await loadStaff();
+
+setUpdating(false);
 
 }
 
@@ -284,30 +359,79 @@ return (
         <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {staff.map((person) => {
             const isLoggedIn = loggedInStaff?.id === person.id;
+            const isEditing = editingStaffId === person.id;
 
             return (
-              <button
+              <div
                 key={person.id}
-                type="button"
-                onClick={() => setSelectedStaffId(person.id)}
-                className={`rounded-2xl border-2 p-4 text-left transition ${
-                  selectedStaffId === person.id
-                    ? "border-slate-900 bg-slate-100"
-                    : "border-slate-200 bg-white hover:border-slate-400"
+                className={`rounded-2xl border-2 p-4 ${
+                  isLoggedIn
+                    ? "border-emerald-300 bg-emerald-50"
+                    : "border-slate-200 bg-white"
                 }`}
               >
-                <div className="flex items-center justify-between gap-3">
-                  <span className="font-black text-slate-900">
-                    {person.display_name}
-                  </span>
+                {isEditing ? (
+                  <>
+                    <input
+                      type="text"
+                      value={editingName}
+                      onChange={(event) =>
+                        setEditingName(event.target.value)
+                      }
+                      className="w-full rounded-xl border-2 border-slate-300 bg-white px-3 py-3 font-black text-slate-900 outline-none focus:border-slate-900"
+                      autoFocus
+                    />
 
-                  {isLoggedIn && (
-                    <span className="whitespace-nowrap rounded-full bg-emerald-100 px-3 py-1 text-xs font-black text-emerald-700">
-                      ログイン中
-                    </span>
-                  )}
-                </div>
-              </button>
+                    <div className="mt-3 flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleUpdateStaffName(person.id)
+                        }
+                        disabled={updating}
+                        className="flex-1 rounded-xl bg-slate-900 px-3 py-3 text-sm font-black text-white hover:bg-slate-800 disabled:bg-slate-300"
+                      >
+                        {updating ? "保存中..." : "保存"}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={cancelEditingStaff}
+                        disabled={updating}
+                        className="rounded-xl bg-slate-200 px-3 py-3 text-sm font-black text-slate-700 hover:bg-slate-300"
+                      >
+                        戻す
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedStaffId(person.id)}
+                        className="text-left font-black text-slate-900"
+                      >
+                        {person.display_name}
+                      </button>
+
+                      {isLoggedIn && (
+                        <span className="whitespace-nowrap rounded-full bg-emerald-100 px-3 py-1 text-xs font-black text-emerald-700">
+                          ログイン中
+                        </span>
+                      )}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => startEditingStaff(person)}
+                      className="mt-3 w-full rounded-xl bg-slate-100 px-3 py-2 text-sm font-black text-slate-700 hover:bg-slate-200"
+                    >
+                      名前を変更
+                    </button>
+                  </>
+                )}
+              </div>
             );
           })}
         </div>
