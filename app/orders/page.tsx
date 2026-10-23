@@ -98,10 +98,22 @@ day: "2-digit",
 .replaceAll("/", "-");
 }
 
+function getTodayKey() {
+const now = new Date();
+
+return new Intl.DateTimeFormat("ja-JP", {
+year: "numeric",
+month: "2-digit",
+day: "2-digit",
+})
+.format(now)
+.replaceAll("/", "-");
+}
+
 export default function OrdersPage() {
 const [orders, setOrders] = useState<Order[]>([]);
 const [loading, setLoading] = useState(true);
-const [todayKey, setTodayKey] = useState("");
+const [selectedDate, setSelectedDate] = useState("");
 
 const loadOrders = useCallback(async () => {
 setLoading(true);
@@ -125,49 +137,40 @@ setLoading(false);
 }, []);
 
 useEffect(() => {
-const now = new Date();
-
-const key = new Intl.DateTimeFormat("ja-JP", {
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-})
-  .format(now)
-  .replaceAll("/", "-");
-
-setTodayKey(key);
-
+setSelectedDate(getTodayKey());
 }, []);
 
 useEffect(() => {
 loadOrders();
 }, [loadOrders]);
 
-const todayOrders = orders.filter(
-(order) => formatDateKey(order.created_at) === todayKey
+const selectedDateOrders = orders.filter(
+(order) => formatDateKey(order.created_at) === selectedDate
 );
 
-const validTodayOrders = todayOrders.filter(
+const validSelectedDateOrders = selectedDateOrders.filter(
 (order) => order.status !== "cancelled"
 );
 
-const cancelledTodayOrders = todayOrders.filter(
+const cancelledSelectedDateOrders = selectedDateOrders.filter(
 (order) => order.status === "cancelled"
 );
 
-const todaySales = validTodayOrders.reduce(
+const selectedDateSales = validSelectedDateOrders.reduce(
 (sum, order) => sum + order.total_price,
 0
 );
 
 const averageOrderValue =
-validTodayOrders.length > 0
-? Math.round(todaySales / validTodayOrders.length)
+validSelectedDateOrders.length > 0
+? Math.round(
+selectedDateSales / validSelectedDateOrders.length
+)
 : 0;
 
 const productSalesMap: Record<string, ProductSales> = {};
 
-validTodayOrders.forEach((order) => {
+validSelectedDateOrders.forEach((order) => {
 order.items.forEach((item) => {
 if (!productSalesMap[item.productId]) {
 productSalesMap[item.productId] = {
@@ -198,7 +201,7 @@ return (
 </h1>
 
         <p className="mt-1 font-medium text-slate-700">
-          これまでの注文と売上を確認できます。
+          日付を選択して注文と売上を確認できます。
         </p>
       </div>
 
@@ -211,14 +214,37 @@ return (
       </button>
     </header>
 
+    <div className="mb-6 rounded-2xl bg-white p-5 shadow-sm">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="font-black text-slate-900">
+            集計日
+          </p>
+
+          <p className="mt-1 text-sm font-medium text-slate-600">
+            確認したい日付を選択してください。
+          </p>
+        </div>
+
+        <input
+          type="date"
+          value={selectedDate}
+          onChange={(event) =>
+            setSelectedDate(event.target.value)
+          }
+          className="rounded-xl border-2 border-slate-300 bg-white px-4 py-3 text-lg font-black text-slate-900 outline-none focus:border-slate-900"
+        />
+      </div>
+    </div>
+
     <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <div className="rounded-2xl bg-white p-6 shadow-sm">
         <p className="font-bold text-slate-600">
-          本日の注文数
+          {selectedDate} の注文数
         </p>
 
         <p className="mt-2 text-4xl font-black text-slate-900">
-          {validTodayOrders.length}
+          {validSelectedDateOrders.length}
           <span className="ml-2 text-xl">件</span>
         </p>
 
@@ -229,11 +255,11 @@ return (
 
       <div className="rounded-2xl bg-white p-6 shadow-sm">
         <p className="font-bold text-slate-600">
-          本日の売上
+          {selectedDate} の売上
         </p>
 
         <p className="mt-2 text-4xl font-black text-slate-900">
-          ¥{todaySales.toLocaleString("ja-JP")}
+          ¥{selectedDateSales.toLocaleString("ja-JP")}
         </p>
 
         <p className="mt-2 text-sm font-bold text-slate-500">
@@ -261,7 +287,7 @@ return (
         </p>
 
         <p className="mt-2 text-4xl font-black text-red-600">
-          {cancelledTodayOrders.length}
+          {cancelledSelectedDateOrders.length}
           <span className="ml-2 text-xl">件</span>
         </p>
 
@@ -278,14 +304,14 @@ return (
         </h2>
 
         <p className="mt-1 text-sm font-medium text-slate-600">
-          本日の販売実績です。取消した注文は含まれていません。
+          選択した日の販売実績です。取消した注文は含まれていません。
         </p>
       </div>
 
       {productSales.length === 0 ? (
         <div className="p-8 text-center">
           <p className="font-bold text-slate-600">
-            本日の商品売上はありません
+            この日の商品売上はありません
           </p>
         </div>
       ) : (
@@ -320,10 +346,10 @@ return (
           注文履歴を読み込んでいます...
         </p>
       </div>
-    ) : orders.length === 0 ? (
+    ) : selectedDateOrders.length === 0 ? (
       <div className="rounded-2xl bg-white p-12 text-center">
         <p className="text-lg font-bold text-slate-600">
-          注文履歴はありません
+          この日の注文履歴はありません
         </p>
       </div>
     ) : (
@@ -335,7 +361,7 @@ return (
         </div>
 
         <div className="divide-y divide-slate-200">
-          {orders.map((order) => (
+          {selectedDateOrders.map((order) => (
             <div
               key={order.id}
               className="p-5"
