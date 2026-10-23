@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
 import { supabase } from "@/lib/supabase";
 
 type Product = {
@@ -18,22 +17,47 @@ price: number;
 quantity: number;
 };
 
+type Staff = {
+id: string;
+display_name: string;
+};
+
 export default function Home() {
 const [products, setProducts] = useState<Product[]>([]);
+const [staff, setStaff] = useState<Staff[]>([]);
+const [selectedStaffName, setSelectedStaffName] = useState("");
 const [cart, setCart] = useState<CartItem[]>([]);
 const [cashReceived, setCashReceived] = useState("");
 const [loading, setLoading] = useState(true);
 const [checkingOut, setCheckingOut] = useState(false);
-
+const [errorMessage, setErrorMessage] = useState("");
 const [receipt, setReceipt] = useState<{
 orderNumber: number;
 total: number;
 cashReceived: number;
 change: number;
+staffName: string;
 } | null>(null);
 
 useEffect(() => {
 loadProducts();
+loadStaff();
+
+const savedStaff = localStorage.getItem("kitchen-order-staff");
+
+if (savedStaff) {
+try {
+const parsedStaff = JSON.parse(savedStaff);
+
+  if (parsedStaff.displayName) {
+    setSelectedStaffName(parsedStaff.displayName);
+  }
+} catch (error) {
+  console.error("保存されたスタッフ情報の読み込みに失敗しました:", error);
+  localStorage.removeItem("kitchen-order-staff");
+}
+
+}
 }, []);
 
 async function loadProducts() {
@@ -47,7 +71,9 @@ const { data, error } = await supabase
 
 if (error) {
   console.error("商品取得エラー:", error);
-  alert("商品を取得できませんでした。");
+  setErrorMessage(
+    "商品を取得できませんでした。通信状態を確認して、ページを再読み込みしてください。"
+  );
   setLoading(false);
   return;
 }
@@ -57,10 +83,30 @@ setLoading(false);
 
 }
 
+async function loadStaff() {
+const { data, error } = await supabase
+.from("staff_profiles")
+.select("id, display_name")
+.order("display_name");
+
+if (error) {
+  console.error("スタッフ取得エラー:", error);
+  setErrorMessage(
+    "スタッフを取得できませんでした。スタッフ登録を確認してください。"
+  );
+  return;
+}
+
+setStaff(data ?? []);
+
+}
+
 function addProduct(product: Product) {
 if (checkingOut) {
 return;
 }
+
+setErrorMessage("");
 
 setCart((current) => {
   const existing = current.find(
@@ -96,6 +142,8 @@ if (checkingOut) {
 return;
 }
 
+setErrorMessage("");
+
 setCart((current) =>
   current.map((item) =>
     item.productId === productId
@@ -113,6 +161,8 @@ function decreaseQuantity(productId: string) {
 if (checkingOut) {
 return;
 }
+
+setErrorMessage("");
 
 setCart((current) =>
   current
@@ -134,6 +184,7 @@ if (checkingOut) {
 return;
 }
 
+setErrorMessage("");
 setCart([]);
 setCashReceived("");
 
@@ -152,13 +203,20 @@ if (checkingOut) {
 return;
 }
 
+setErrorMessage("");
+
+if (!selectedStaffName) {
+  setErrorMessage("担当スタッフを選択してください。");
+  return;
+}
+
 if (cart.length === 0) {
-  alert("商品を選択してください。");
+  setErrorMessage("商品を選択してください。");
   return;
 }
 
 if (cash < total) {
-  alert("預かり金額が不足しています。");
+  setErrorMessage("預かり金額が不足しています。");
   return;
 }
 
@@ -170,7 +228,9 @@ try {
 
   if (numberError) {
     console.error("整理番号取得エラー:", numberError);
-    alert("整理番号を取得できませんでした。");
+    setErrorMessage(
+      "整理番号を取得できませんでした。通信状態を確認して、もう一度お試しください。"
+    );
     return;
   }
 
@@ -190,11 +250,14 @@ try {
       change_amount: change,
       status: "new",
       items,
+      staff_name: selectedStaffName,
     });
 
   if (insertError) {
     console.error("注文登録エラー:", insertError);
-    alert("注文を登録できませんでした。");
+    setErrorMessage(
+      "注文を登録できませんでした。注文は確定していません。通信状態を確認して、もう一度お試しください。"
+    );
     return;
   }
 
@@ -203,13 +266,16 @@ try {
     total,
     cashReceived: cash,
     change,
+    staffName: selectedStaffName,
   });
 
   setCart([]);
   setCashReceived("");
 } catch (error) {
   console.error("会計処理エラー:", error);
-  alert("会計処理中にエラーが発生しました。もう一度お試しください。");
+  setErrorMessage(
+    "通信エラーが発生しました。注文は確定していません。もう一度お試しください。"
+  );
 } finally {
   setCheckingOut(false);
 }
@@ -237,7 +303,16 @@ return (
           </p>
         </div>
 
-        <div className="mt-8 rounded-3xl bg-slate-950 p-8 text-center">
+        <div className="mt-6 rounded-2xl bg-blue-50 p-5 text-center">
+          <p className="text-sm font-black text-slate-600">
+            担当スタッフ
+          </p>
+          <p className="mt-1 text-2xl font-black text-blue-700">
+            {receipt.staffName}
+          </p>
+        </div>
+
+        <div className="mt-6 rounded-3xl bg-slate-950 p-8 text-center">
           <p className="text-lg font-black text-slate-300">
             整理番号
           </p>
@@ -308,6 +383,33 @@ return (
         商品を選択して会計を行ってください。
       </p>
     </header>
+
+    {errorMessage && (
+      <div
+        role="alert"
+        className="mb-5 rounded-2xl border-2 border-red-200 bg-red-50 p-4 shadow-sm"
+      >
+        <div className="flex items-start gap-3">
+          <span className="text-xl font-black text-red-600">
+            !
+          </span>
+
+          <div>
+            <p className="font-black text-red-700">
+              {errorMessage}
+            </p>
+
+            <button
+              type="button"
+              onClick={() => setErrorMessage("")}
+              className="mt-2 text-sm font-black text-red-600 underline"
+            >
+              閉じる
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
 
     <div className="grid gap-5 lg:grid-cols-[1fr_420px] lg:gap-6">
       <section>
@@ -412,6 +514,39 @@ return (
           </div>
 
           <div className="p-4 md:p-5">
+            <div className="mb-5 rounded-2xl border-2 border-blue-200 bg-blue-50 p-4">
+              <label
+                htmlFor="staff"
+                className="mb-2 block text-lg font-black text-slate-800"
+              >
+                担当スタッフ
+              </label>
+
+              <select
+                id="staff"
+                value={selectedStaffName}
+                onChange={(event) => {
+                  setSelectedStaffName(event.target.value);
+                  setErrorMessage("");
+                }}
+                disabled={checkingOut}
+                className="w-full rounded-2xl border-2 border-slate-300 bg-white px-4 py-4 text-lg font-black text-slate-950 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 disabled:bg-slate-100"
+              >
+                <option value="">
+                  スタッフを選択してください
+                </option>
+
+                {staff.map((person) => (
+                  <option
+                    key={person.id}
+                    value={person.display_name}
+                  >
+                    {person.display_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             {cart.length === 0 ? (
               <div className="rounded-2xl bg-slate-100 p-8 text-center md:p-10">
                 <p className="text-lg font-black text-slate-600">
@@ -443,9 +578,7 @@ return (
                         <button
                           type="button"
                           onClick={() =>
-                            decreaseQuantity(
-                              item.productId
-                            )
+                            decreaseQuantity(item.productId)
                           }
                           disabled={checkingOut}
                           className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-200 text-2xl font-black text-slate-900 hover:bg-slate-300 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
@@ -460,9 +593,7 @@ return (
                         <button
                           type="button"
                           onClick={() =>
-                            increaseQuantity(
-                              item.productId
-                            )
+                            increaseQuantity(item.productId)
                           }
                           disabled={checkingOut}
                           className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-900 text-2xl font-black text-white hover:bg-slate-800 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
@@ -545,6 +676,7 @@ return (
               onClick={checkout}
               disabled={
                 checkingOut ||
+                !selectedStaffName ||
                 cart.length === 0 ||
                 cash < total
               }
