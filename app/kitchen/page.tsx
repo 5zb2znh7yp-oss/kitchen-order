@@ -11,7 +11,12 @@ price: number;
 quantity: number;
 };
 
-type OrderStatus = "new" | "cooking" | "ready" | "completed" | "cancelled";
+type OrderStatus =
+| "new"
+| "cooking"
+| "ready"
+| "completed"
+| "cancelled";
 
 type Order = {
 id: string;
@@ -95,6 +100,7 @@ const itemsText = order.items
 .map((item) => `${item.name} × ${item.quantity}`)
 .join("\n");
 
+
 const message =
   `注文番号 ${String(order.order_number).padStart(3, "0")}\n\n` +
   `${itemsText}\n\n` +
@@ -147,15 +153,15 @@ const readyOrders = orders.filter(
 );
 
 return (
-<main className="min-h-screen bg-slate-100 p-3 md:p-5">
-<div className="mx-auto max-w-[1800px]">
+<main className="min-h-screen bg-slate-100 p-3 sm:p-4 md:p-5">
+<div className="mx-auto max-w-[1900px]">
 <header className="mb-5 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
 <div>
 <h1 className="text-3xl font-black text-slate-950 md:text-4xl">
 厨房
 </h1>
 
-        <p className="mt-1 font-bold text-slate-700">
+        <p className="mt-1 text-base font-bold text-slate-700">
           注文を確認して調理状態を更新してください。
         </p>
       </div>
@@ -177,7 +183,7 @@ return (
         <button
           type="button"
           onClick={loadOrders}
-          className="rounded-2xl bg-slate-950 px-5 py-4 font-black text-white shadow-sm hover:bg-slate-800"
+          className="rounded-2xl bg-slate-950 px-6 py-4 text-lg font-black text-white shadow-sm transition hover:bg-slate-800 active:scale-[0.98]"
         >
           更新
         </button>
@@ -276,21 +282,21 @@ onCancel: (order: Order) => void;
 }) {
 return (
 <section className="overflow-hidden rounded-3xl bg-white shadow-sm">
-<div className={headerClass + " px-5 py-5 text-white"}>
+<div className={headerClass + " px-5 py-5 text-white md"}>
 <div className="flex items-center justify-between">
 <div>
-<h2 className="text-3xl font-black">
+<h2 className="text-3xl font-black md:text-4xl">
 {title}
 </h2>
 
-        <p className="mt-1 font-bold text-white/90">
+        <p className="mt-1 text-base font-bold text-white/90">
           {subtitle}
         </p>
       </div>
 
-      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white">
+      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white md:h-18 md:w-18">
         <span
-          className={"text-2xl font-black " + countClass}
+          className={"text-3xl font-black " + countClass}
         >
           {count}
         </span>
@@ -298,15 +304,15 @@ return (
     </div>
   </div>
 
-  <div className="min-h-[400px] space-y-4 bg-slate-50 p-4">
+  <div className="min-h-[500px] space-y-4 bg-slate-50 p-4 md:p-5">
     {orders.length === 0 ? (
-      <div className="flex min-h-[300px] items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 bg-white">
+      <div className="flex min-h-[360px] items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 bg-white">
         <div className="text-center">
           <p className="text-xl font-black text-slate-600">
             注文はありません
           </p>
 
-          <p className="mt-1 font-medium text-slate-500">
+          <p className="mt-2 font-bold text-slate-500">
             新しい注文を待っています
           </p>
         </div>
@@ -352,14 +358,14 @@ nextStatus: "cooking" | "ready" | "completed"
 onCancel: (order: Order) => void;
 }) {
 return (
-<div className="rounded-3xl border-2 border-slate-200 bg-white p-5 shadow-sm">
-<div className="flex items-center justify-between">
+<div className="rounded-3xl border-2 border-slate-200 bg-white p-5 shadow-sm md:p-6">
+<div className="flex items-start justify-between gap-4">
 <div>
-<p className="text-sm font-black text-slate-600">
+<p className="text-sm font-black text-slate-600 md:text-base">
 整理番号
 </p>
 
-      <p className="text-6xl font-black tracking-widest text-slate-950">
+      <p className="mt-1 text-6xl font-black tracking-widest text-slate-950 md:text-7xl">
         {String(order.order_number).padStart(3, "0")}
       </p>
     </div>
@@ -369,7 +375,7 @@ return (
         受付
       </p>
 
-      <p className="text-xl font-black text-slate-800">
+      <p className="mt-1 text-xl font-black text-slate-800 md:text-2xl">
         {formatTime(order.created_at)}
       </p>
     </div>
@@ -377,8 +383,8 @@ return (
 
   <div className="my-5 border-t-2 border-slate-100" />
 
-  <div className="rounded-2xl bg-slate-100 p-4">
-    <p className="mb-3 text-sm font-black text-slate-600">
+  <div className="rounded-2xl bg-slate-100 p-4 md:p-5">
+    <p className="mb-4 text-sm font-black text-slate-600 md:text-base">
       注文内容
     </p>
 
@@ -388,11 +394,11 @@ return (
           key={order.id + "-" + index}
           className="flex items-center justify-between gap-3"
         >
-          <span className="text-xl font-black text-slate-950">
+          <span className="min-w-0 text-xl font-black text-slate-950 md:text-2xl">
             {item.name}
           </span>
 
-          <span className="rounded-lg bg-white px-3 py-1 text-xl font-black text-slate-950 shadow-sm">
+          <span className="shrink-0 rounded-xl bg-white px-4 py-2 text-xl font-black text-slate-950 shadow-sm md:text-2xl">
             × {item.quantity}
           </span>
         </div>
@@ -401,11 +407,11 @@ return (
   </div>
 
   <div className="mt-4 flex items-center justify-between">
-    <span className="font-bold text-slate-600">
+    <span className="text-base font-bold text-slate-600">
       合計
     </span>
 
-    <span className="text-xl font-black text-slate-950">
+    <span className="text-2xl font-black text-slate-950">
       ¥{order.total_price.toLocaleString("ja-JP")}
     </span>
   </div>
@@ -415,7 +421,7 @@ return (
     onClick={() => onUpdate(order.id, nextStatus)}
     disabled={updatingId === order.id}
     className={
-      "mt-4 w-full rounded-2xl py-5 text-xl font-black text-white shadow-md transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 " +
+      "mt-5 min-h-[68px] w-full rounded-2xl py-5 text-2xl font-black text-white shadow-md transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 md:min-h-[76px] md:text-3xl " +
       buttonClass
     }
   >
@@ -428,7 +434,7 @@ return (
     type="button"
     onClick={() => onCancel(order)}
     disabled={updatingId === order.id}
-    className="mt-3 w-full rounded-2xl border-2 border-red-300 bg-white py-3 text-lg font-black text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+    className="mt-3 min-h-[52px] w-full rounded-2xl border-2 border-red-300 bg-white py-3 text-lg font-black text-red-600 transition hover:bg-red-50 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
   >
     注文取消し
   </button>
