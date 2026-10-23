@@ -5,368 +5,423 @@ import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
 type OrderItem = {
-  productId: string;
-  name: string;
-  price: number;
-  quantity: number;
+productId: string;
+name: string;
+price: number;
+quantity: number;
 };
 
 type OrderStatus = "new" | "cooking" | "ready" | "completed";
 
 type Order = {
-  id: string;
-  order_number: number;
-  total_price: number;
-  items: OrderItem[];
-  status: OrderStatus;
-  created_at: string;
+id: string;
+order_number: number;
+total_price: number;
+items: OrderItem[];
+status: OrderStatus;
+created_at: string;
 };
 
 function formatTime(dateString: string) {
-  return new Date(dateString).toLocaleTimeString("ja-JP", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+return new Date(dateString).toLocaleTimeString("ja-JP", {
+hour: "2-digit",
+minute: "2-digit",
+});
 }
 
 export default function KitchenPage() {
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [updatingId, setUpdatingId] = useState<string | null>(null);
+const [orders, setOrders] = useState<Order[]>([]);
+const [loading, setLoading] = useState(true);
+const [updatingId, setUpdatingId] = useState<string | null>(null);
 
-  const loadOrders = useCallback(async () => {
-    const { data, error } = await supabase
-      .from("orders")
-      .select(
-        "id, order_number, total_price, items, status, created_at"
-      )
-      .in("status", ["new", "cooking", "ready"])
-      .order("created_at", { ascending: true });
+const loadOrders = useCallback(async () => {
+const { data, error } = await supabase
+.from("orders")
+.select("id, order_number, total_price, items, status, created_at")
+.in("status", ["new", "cooking", "ready"])
+.order("created_at", { ascending: true });
 
-    if (error) {
-      console.error("厨房注文取得エラー:", error);
-      setLoading(false);
-      return;
-    }
+if (error) {
+  console.error("厨房注文取得エラー:", error);
+  setLoading(false);
+  return;
+}
 
-    setOrders((data ?? []) as Order[]);
-    setLoading(false);
-  }, []);
+setOrders((data ?? []) as Order[]);
+setLoading(false);
 
-  useEffect(() => {
-    loadOrders();
+}, []);
 
-    const timer = window.setInterval(() => {
-      loadOrders();
-    }, 3000);
+useEffect(() => {
+loadOrders();
 
-    return () => {
-      window.clearInterval(timer);
-    };
-  }, [loadOrders]);
+const timer = window.setInterval(() => {
+  loadOrders();
+}, 3000);
 
-  async function updateStatus(
-    orderId: string,
-    nextStatus: "cooking" | "ready" | "completed"
-  ) {
-    setUpdatingId(orderId);
+return () => {
+  window.clearInterval(timer);
+};
 
-    const { error } = await supabase
-      .from("orders")
-      .update({
-        status: nextStatus,
-      })
-      .eq("id", orderId);
+}, [loadOrders]);
 
-    if (error) {
-      console.error("注文ステータス更新エラー:", error);
-      alert("注文状態を更新できませんでした。");
-      setUpdatingId(null);
-      return;
-    }
+async function updateStatus(
+orderId: string,
+nextStatus: "cooking" | "ready" | "completed"
+) {
+setUpdatingId(orderId);
 
-    await loadOrders();
-    setUpdatingId(null);
-  }
+const { error } = await supabase
+  .from("orders")
+  .update({
+    status: nextStatus,
+  })
+  .eq("id", orderId);
 
-  const newOrders = orders.filter(
-    (order) => order.status === "new"
-  );
+if (error) {
+  console.error("注文ステータス更新エラー:", error);
+  alert("注文状態を更新できませんでした。");
+  setUpdatingId(null);
+  return;
+}
 
-  const cookingOrders = orders.filter(
-    (order) => order.status === "cooking"
-  );
+await loadOrders();
+setUpdatingId(null);
 
-  const readyOrders = orders.filter(
-    (order) => order.status === "ready"
-  );
+}
 
-  return (
-    <main className="min-h-screen bg-slate-100 p-3 md:p-5">
-      <div className="mx-auto max-w-[1800px]">
-        <header className="mb-5 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h1 className="text-3xl font-black text-slate-950 md:text-4xl">
-              厨房
-            </h1>
+async function cancelOrder(orderId: string) {
+const confirmed = window.confirm(
+"この注文を取り消しますか？\n\n取り消した注文は注文履歴には残りますが、売上には含まれません。"
+);
 
-            <p className="mt-1 font-bold text-slate-700">
-              注文を確認して調理状態を更新してください。
-            </p>
-          </div>
+if (!confirmed) {
+  return;
+}
 
-          <div className="flex items-center gap-3">
-            <div className="rounded-2xl bg-white px-5 py-3 shadow-sm">
-              <p className="text-sm font-black text-slate-600">
-                表示中
-              </p>
+setUpdatingId(orderId);
 
-              <p className="text-3xl font-black text-slate-950">
-                {orders.length}
-                <span className="ml-1 text-base">
-                  件
-                </span>
-              </p>
-            </div>
+const { error } = await supabase
+  .from("orders")
+  .update({
+    status: "cancelled",
+  })
+  .eq("id", orderId);
 
-            <button
-              type="button"
-              onClick={loadOrders}
-              className="rounded-2xl bg-slate-950 px-5 py-4 font-black text-white shadow-sm hover:bg-slate-800"
-            >
-              更新
-            </button>
-          </div>
-        </header>
+if (error) {
+  console.error("注文取消しエラー:", error);
+  alert("注文を取り消せませんでした。");
+  setUpdatingId(null);
+  return;
+}
 
-        {loading ? (
-          <div className="rounded-3xl bg-white p-14 text-center shadow-sm">
-            <p className="text-xl font-black text-slate-700">
-              注文を読み込んでいます...
-            </p>
-          </div>
-        ) : (
-          <div className="grid gap-5 xl:grid-cols-3">
-            <KitchenColumn
-              title="新規"
-              subtitle="これから調理"
-              count={newOrders.length}
-              orders={newOrders}
-              headerClass="bg-blue-600"
-              countClass="text-blue-700"
-              buttonText="調理開始"
-              buttonClass="bg-blue-600 hover:bg-blue-700"
-              nextStatus="cooking"
-              updatingId={updatingId}
-              onUpdate={updateStatus}
-            />
+setOrders((currentOrders) =>
+  currentOrders.filter((order) => order.id !== orderId)
+);
 
-            <KitchenColumn
-              title="調理中"
-              subtitle="現在調理中"
-              count={cookingOrders.length}
-              orders={cookingOrders}
-              headerClass="bg-orange-500"
-              countClass="text-orange-700"
-              buttonText="調理完了"
-              buttonClass="bg-orange-500 hover:bg-orange-600"
-              nextStatus="ready"
-              updatingId={updatingId}
-              onUpdate={updateStatus}
-            />
+setUpdatingId(null);
 
-            <KitchenColumn
-              title="完成"
-              subtitle="お客様を呼出"
-              count={readyOrders.length}
-              orders={readyOrders}
-              headerClass="bg-green-600"
-              countClass="text-green-700"
-              buttonText="呼出済みにする"
-              buttonClass="bg-green-600 hover:bg-green-700"
-              nextStatus="completed"
-              updatingId={updatingId}
-              onUpdate={updateStatus}
-            />
-          </div>
-        )}
+}
+
+const newOrders = orders.filter(
+(order) => order.status === "new"
+);
+
+const cookingOrders = orders.filter(
+(order) => order.status === "cooking"
+);
+
+const readyOrders = orders.filter(
+(order) => order.status === "ready"
+);
+
+return (
+<main className="min-h-screen bg-slate-100 p-3 md:p-5">
+<div className="mx-auto max-w-[1800px]">
+<header className="mb-5 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+<div>
+<h1 className="text-3xl font-black text-slate-950 md:text-4xl">
+厨房
+</h1>
+
+        <p className="mt-1 font-bold text-slate-700">
+          注文を確認して調理状態を更新してください。
+        </p>
       </div>
-    </main>
-  );
+
+      <div className="flex items-center gap-3">
+        <div className="rounded-2xl bg-white px-5 py-3 shadow-sm">
+          <p className="text-sm font-black text-slate-600">
+            表示中
+          </p>
+
+          <p className="text-3xl font-black text-slate-950">
+            {orders.length}
+            <span className="ml-1 text-base">
+              件
+            </span>
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={loadOrders}
+          className="rounded-2xl bg-slate-950 px-5 py-4 font-black text-white shadow-sm hover:bg-slate-800"
+        >
+          更新
+        </button>
+      </div>
+    </header>
+
+    {loading ? (
+      <div className="rounded-3xl bg-white p-14 text-center shadow-sm">
+        <p className="text-xl font-black text-slate-700">
+          注文を読み込んでいます...
+        </p>
+      </div>
+    ) : (
+      <div className="grid gap-5 xl:grid-cols-3">
+        <KitchenColumn
+          title="新規"
+          subtitle="これから調理"
+          count={newOrders.length}
+          orders={newOrders}
+          headerClass="bg-blue-600"
+          countClass="text-blue-700"
+          buttonText="調理開始"
+          buttonClass="bg-blue-600 hover:bg-blue-700"
+          nextStatus="cooking"
+          updatingId={updatingId}
+          onUpdate={updateStatus}
+          onCancel={cancelOrder}
+        />
+
+        <KitchenColumn
+          title="調理中"
+          subtitle="現在調理中"
+          count={cookingOrders.length}
+          orders={cookingOrders}
+          headerClass="bg-orange-500"
+          countClass="text-orange-700"
+          buttonText="調理完了"
+          buttonClass="bg-orange-500 hover:bg-orange-600"
+          nextStatus="ready"
+          updatingId={updatingId}
+          onUpdate={updateStatus}
+          onCancel={cancelOrder}
+        />
+
+        <KitchenColumn
+          title="完成"
+          subtitle="お客様を呼出"
+          count={readyOrders.length}
+          orders={readyOrders}
+          headerClass="bg-green-600"
+          countClass="text-green-700"
+          buttonText="呼出済みにする"
+          buttonClass="bg-green-600 hover:bg-green-700"
+          nextStatus="completed"
+          updatingId={updatingId}
+          onUpdate={updateStatus}
+          onCancel={cancelOrder}
+        />
+      </div>
+    )}
+  </div>
+</main>
+
+);
 }
 
 function KitchenColumn({
-  title,
-  subtitle,
-  count,
-  orders,
-  headerClass,
-  countClass,
-  buttonText,
-  buttonClass,
-  nextStatus,
-  updatingId,
-  onUpdate,
+title,
+subtitle,
+count,
+orders,
+headerClass,
+countClass,
+buttonText,
+buttonClass,
+nextStatus,
+updatingId,
+onUpdate,
+onCancel,
 }: {
-  title: string;
-  subtitle: string;
-  count: number;
-  orders: Order[];
-  headerClass: string;
-  countClass: string;
-  buttonText: string;
-  buttonClass: string;
-  nextStatus: "cooking" | "ready" | "completed";
-  updatingId: string | null;
-  onUpdate: (
-    orderId: string,
-    nextStatus: "cooking" | "ready" | "completed"
-  ) => void;
+title: string;
+subtitle: string;
+count: number;
+orders: Order[];
+headerClass: string;
+countClass: string;
+buttonText: string;
+buttonClass: string;
+nextStatus: "cooking" | "ready" | "completed";
+updatingId: string | null;
+onUpdate: (
+orderId: string,
+nextStatus: "cooking" | "ready" | "completed"
+) => void;
+onCancel: (orderId: string) => void;
 }) {
-  return (
-    <section className="overflow-hidden rounded-3xl bg-white shadow-sm">
-      <div className={`px-5 py-5 text-white ${headerClass}`}>
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-3xl font-black">
-              {title}
-            </h2>
+return (
+<section className="overflow-hidden rounded-3xl bg-white shadow-sm">
+<div className={headerClass + " px-5 py-5 text-white"}>
+<div className="flex items-center justify-between">
+<div>
+<h2 className="text-3xl font-black">
+{title}
+</h2>
 
-            <p className="mt-1 font-bold text-white/90">
-              {subtitle}
-            </p>
-          </div>
+        <p className="mt-1 font-bold text-white/90">
+          {subtitle}
+        </p>
+      </div>
 
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white">
-            <span
-              className={`text-2xl font-black ${countClass}`}
-            >
-              {count}
-            </span>
-          </div>
+      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white">
+        <span
+          className={"text-2xl font-black " + countClass}
+        >
+          {count}
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <div className="min-h-[400px] space-y-4 bg-slate-50 p-4">
+    {orders.length === 0 ? (
+      <div className="flex min-h-[300px] items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 bg-white">
+        <div className="text-center">
+          <p className="text-xl font-black text-slate-600">
+            注文はありません
+          </p>
+
+          <p className="mt-1 font-medium text-slate-500">
+            新しい注文を待っています
+          </p>
         </div>
       </div>
+    ) : (
+      orders.map((order) => (
+        <OrderCard
+          key={order.id}
+          order={order}
+          buttonText={buttonText}
+          buttonClass={buttonClass}
+          nextStatus={nextStatus}
+          updatingId={updatingId}
+          onUpdate={onUpdate}
+          onCancel={onCancel}
+        />
+      ))
+    )}
+  </div>
+</section>
 
-      <div className="min-h-[400px] space-y-4 bg-slate-50 p-4">
-        {orders.length === 0 ? (
-          <div className="flex min-h-[300px] items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 bg-white">
-            <div className="text-center">
-              <p className="text-xl font-black text-slate-600">
-                注文はありません
-              </p>
-
-              <p className="mt-1 font-medium text-slate-500">
-                新しい注文を待っています
-              </p>
-            </div>
-          </div>
-        ) : (
-          orders.map((order) => (
-            <OrderCard
-              key={order.id}
-              order={order}
-              buttonText={buttonText}
-              buttonClass={buttonClass}
-              nextStatus={nextStatus}
-              updatingId={updatingId}
-              onUpdate={onUpdate}
-            />
-          ))
-        )}
-      </div>
-    </section>
-  );
+);
 }
 
 function OrderCard({
-  order,
-  buttonText,
-  buttonClass,
-  nextStatus,
-  updatingId,
-  onUpdate,
+order,
+buttonText,
+buttonClass,
+nextStatus,
+updatingId,
+onUpdate,
+onCancel,
 }: {
-  order: Order;
-  buttonText: string;
-  buttonClass: string;
-  nextStatus: "cooking" | "ready" | "completed";
-  updatingId: string | null;
-  onUpdate: (
-    orderId: string,
-    nextStatus: "cooking" | "ready" | "completed"
-  ) => void;
+order: Order;
+buttonText: string;
+buttonClass: string;
+nextStatus: "cooking" | "ready" | "completed";
+updatingId: string | null;
+onUpdate: (
+orderId: string,
+nextStatus: "cooking" | "ready" | "completed"
+) => void;
+onCancel: (orderId: string) => void;
 }) {
-  return (
-    <div className="rounded-3xl border-2 border-slate-200 bg-white p-5 shadow-sm">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm font-black text-slate-600">
-            整理番号
-          </p>
+return (
+<div className="rounded-3xl border-2 border-slate-200 bg-white p-5 shadow-sm">
+<div className="flex items-center justify-between">
+<div>
+<p className="text-sm font-black text-slate-600">
+整理番号
+</p>
 
-          <p className="text-6xl font-black tracking-widest text-slate-950">
-            {String(order.order_number).padStart(3, "0")}
-          </p>
-        </div>
-
-        <div className="text-right">
-          <p className="text-sm font-black text-slate-500">
-            受付
-          </p>
-
-          <p className="text-xl font-black text-slate-800">
-            {formatTime(order.created_at)}
-          </p>
-        </div>
-      </div>
-
-      <div className="my-5 border-t-2 border-slate-100" />
-
-      <div className="rounded-2xl bg-slate-100 p-4">
-        <p className="mb-3 text-sm font-black text-slate-600">
-          注文内容
-        </p>
-
-        <div className="space-y-3">
-          {order.items.map((item, index) => (
-            <div
-              key={`${order.id}-${index}`}
-              className="flex items-center justify-between gap-3"
-            >
-              <span className="text-xl font-black text-slate-950">
-                {item.name}
-              </span>
-
-              <span className="rounded-lg bg-white px-3 py-1 text-xl font-black text-slate-950 shadow-sm">
-                × {item.quantity}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="mt-4 flex items-center justify-between">
-        <span className="font-bold text-slate-600">
-          合計
-        </span>
-
-        <span className="text-xl font-black text-slate-950">
-          ¥{order.total_price.toLocaleString("ja-JP")}
-        </span>
-      </div>
-
-      <button
-        type="button"
-        onClick={() =>
-          onUpdate(order.id, nextStatus)
-        }
-        disabled={updatingId === order.id}
-        className={`mt-4 w-full rounded-2xl py-5 text-xl font-black text-white shadow-md transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 ${buttonClass}`}
-      >
-        {updatingId === order.id
-          ? "更新中..."
-          : buttonText}
-      </button>
+      <p className="text-6xl font-black tracking-widest text-slate-950">
+        {String(order.order_number).padStart(3, "0")}
+      </p>
     </div>
-  );
+
+    <div className="text-right">
+      <p className="text-sm font-black text-slate-500">
+        受付
+      </p>
+
+      <p className="text-xl font-black text-slate-800">
+        {formatTime(order.created_at)}
+      </p>
+    </div>
+  </div>
+
+  <div className="my-5 border-t-2 border-slate-100" />
+
+  <div className="rounded-2xl bg-slate-100 p-4">
+    <p className="mb-3 text-sm font-black text-slate-600">
+      注文内容
+    </p>
+
+    <div className="space-y-3">
+      {order.items.map((item, index) => (
+        <div
+          key={order.id + "-" + index}
+          className="flex items-center justify-between gap-3"
+        >
+          <span className="text-xl font-black text-slate-950">
+            {item.name}
+          </span>
+
+          <span className="rounded-lg bg-white px-3 py-1 text-xl font-black text-slate-950 shadow-sm">
+            × {item.quantity}
+          </span>
+        </div>
+      ))}
+    </div>
+  </div>
+
+  <div className="mt-4 flex items-center justify-between">
+    <span className="font-bold text-slate-600">
+      合計
+    </span>
+
+    <span className="text-xl font-black text-slate-950">
+      ¥{order.total_price.toLocaleString("ja-JP")}
+    </span>
+  </div>
+
+  <button
+    type="button"
+    onClick={() => onUpdate(order.id, nextStatus)}
+    disabled={updatingId === order.id}
+    className={
+      "mt-4 w-full rounded-2xl py-5 text-xl font-black text-white shadow-md transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 " +
+      buttonClass
+    }
+  >
+    {updatingId === order.id
+      ? "更新中..."
+      : buttonText}
+  </button>
+
+  <button
+    type="button"
+    onClick={() => onCancel(order.id)}
+    disabled={updatingId === order.id}
+    className="mt-3 w-full rounded-2xl border-2 border-red-300 bg-white py-3 text-lg font-black text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+  >
+    注文取消し
+  </button>
+</div>
+
+);
 }
