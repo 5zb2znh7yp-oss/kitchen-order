@@ -2,7 +2,6 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-
 import { supabase } from "@/lib/supabase";
 
 type Staff = {
@@ -22,18 +21,14 @@ const router = useRouter();
 const [staff, setStaff] = useState<Staff[]>([]);
 const [loggedInStaff, setLoggedInStaff] =
 useState<LoggedInStaff | null>(null);
-
 const [selectedStaffId, setSelectedStaffId] = useState("");
 const [displayName, setDisplayName] = useState("");
-
 const [editingStaffId, setEditingStaffId] = useState("");
 const [editingName, setEditingName] = useState("");
-
 const [loading, setLoading] = useState(true);
 const [saving, setSaving] = useState(false);
 const [switching, setSwitching] = useState(false);
 const [updating, setUpdating] = useState(false);
-
 const [message, setMessage] = useState("");
 const [errorMessage, setErrorMessage] = useState("");
 
@@ -79,14 +74,16 @@ try {
       id: parsedStaff.id,
       displayName: parsedStaff.displayName,
     });
-
     setSelectedStaffId(parsedStaff.id);
   } else {
     localStorage.removeItem("kitchen-order-staff");
     setLoggedInStaff(null);
   }
 } catch (error) {
-  console.error("ログインスタッフ情報の読み込みに失敗しました:", error);
+  console.error(
+    "ログインスタッフ情報の読み込みに失敗しました:",
+    error
+  );
   localStorage.removeItem("kitchen-order-staff");
   setLoggedInStaff(null);
 }
@@ -117,7 +114,9 @@ if (error) {
   console.error("スタッフ登録エラー:", error);
 
   if (error.code === "23505") {
-    setErrorMessage("同じ名前のスタッフがすでに登録されています。");
+    setErrorMessage(
+      "同じ名前のスタッフがすでに登録されています。"
+    );
   } else {
     setErrorMessage("スタッフ登録に失敗しました。");
   }
@@ -128,7 +127,6 @@ if (error) {
 
 setDisplayName("");
 setMessage("スタッフを登録しました。");
-
 await loadStaff();
 setSaving(false);
 
@@ -169,7 +167,9 @@ if (error) {
   console.error("スタッフ名変更エラー:", error);
 
   if (error.code === "23505") {
-    setErrorMessage("同じ名前のスタッフがすでに登録されています。");
+    setErrorMessage(
+      "同じ名前のスタッフがすでに登録されています。"
+    );
   } else {
     setErrorMessage("スタッフ名の変更に失敗しました。");
   }
@@ -233,7 +233,6 @@ localStorage.setItem(
 );
 
 setLoggedInStaff(newLoggedInStaff);
-
 setSwitching(false);
 
 router.push("/");
@@ -241,16 +240,21 @@ router.push("/");
 }
 
 return (
-<main className="min-h-screen bg-slate-100 px-4 py-6 md:px-6">
-<div className="mx-auto max-w-5xl">
-<div className="mb-6">
-<p className="text-sm font-bold text-slate-500">Store System</p>
+<main className="min-h-screen bg-slate-100 text-slate-900">
+<header className="bg-slate-900 text-white">
+<div className="mx-auto max-w-7xl px-4 py-4">
+<div>
+<p className="text-sm font-bold text-slate-300">
+Store System
+</p>
+<h1 className="text-2xl font-black">
+スタッフ管理
+</h1>
+</div>
+</div>
+</header>
 
-      <h1 className="mt-1 text-3xl font-black text-slate-900">
-        スタッフ管理
-      </h1>
-    </div>
-
+  <div className="mx-auto max-w-5xl px-4 py-6 md:px-6">
     {message && (
       <div className="mb-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 font-bold text-emerald-700">
         {message}
@@ -282,7 +286,9 @@ return (
             </>
           ) : (
             <>
-              <p className="text-lg font-black">未ログイン</p>
+              <p className="text-lg font-black">
+                未ログイン
+              </p>
 
               <p className="mt-1 text-sm font-bold text-slate-300">
                 下のスタッフ切り替えから選択してください
@@ -325,7 +331,9 @@ return (
           disabled={!selectedStaffId || switching}
           className="mt-4 w-full rounded-2xl bg-slate-900 px-5 py-4 text-lg font-black text-white hover:bg-slate-800 disabled:bg-slate-300"
         >
-          {switching ? "切り替え中..." : "このスタッフでログイン"}
+          {switching
+            ? "切り替え中..."
+            : "このスタッフでログイン"}
         </button>
       </section>
     </div>
@@ -358,17 +366,21 @@ return (
       ) : (
         <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {staff.map((person) => {
-            const isLoggedIn = loggedInStaff?.id === person.id;
-            const isEditing = editingStaffId === person.id;
+            const isLoggedIn =
+              loggedInStaff?.id === person.id;
+
+            const isEditing =
+              editingStaffId === person.id;
 
             return (
               <div
                 key={person.id}
-                className={`rounded-2xl border-2 p-4 ${
-                  isLoggedIn
+                className={
+                  "rounded-2xl border-2 p-4 " +
+                  (isLoggedIn
                     ? "border-emerald-300 bg-emerald-50"
-                    : "border-slate-200 bg-white"
-                }`}
+                    : "border-slate-200 bg-white")
+                }
               >
                 {isEditing ? (
                   <>
@@ -391,7 +403,9 @@ return (
                         disabled={updating}
                         className="flex-1 rounded-xl bg-slate-900 px-3 py-3 text-sm font-black text-white hover:bg-slate-800 disabled:bg-slate-300"
                       >
-                        {updating ? "保存中..." : "保存"}
+                        {updating
+                          ? "保存中..."
+                          : "保存"}
                       </button>
 
                       <button
@@ -409,7 +423,9 @@ return (
                     <div className="flex items-center justify-between gap-3">
                       <button
                         type="button"
-                        onClick={() => setSelectedStaffId(person.id)}
+                        onClick={() =>
+                          setSelectedStaffId(person.id)
+                        }
                         className="text-left font-black text-slate-900"
                       >
                         {person.display_name}
@@ -424,7 +440,9 @@ return (
 
                     <button
                       type="button"
-                      onClick={() => startEditingStaff(person)}
+                      onClick={() =>
+                        startEditingStaff(person)
+                      }
                       className="mt-3 w-full rounded-xl bg-slate-100 px-3 py-2 text-sm font-black text-slate-700 hover:bg-slate-200"
                     >
                       名前を変更
@@ -450,7 +468,9 @@ return (
         <input
           type="text"
           value={displayName}
-          onChange={(event) => setDisplayName(event.target.value)}
+          onChange={(event) =>
+            setDisplayName(event.target.value)
+          }
           placeholder="スタッフ名を入力"
           className="flex-1 rounded-2xl border-2 border-slate-300 px-4 py-4 font-bold outline-none focus:border-slate-900"
         />
@@ -460,7 +480,9 @@ return (
           disabled={saving}
           className="rounded-2xl bg-slate-900 px-6 py-4 font-black text-white hover:bg-slate-800 disabled:bg-slate-300"
         >
-          {saving ? "登録中..." : "スタッフを登録"}
+          {saving
+            ? "登録中..."
+            : "スタッフを登録"}
         </button>
       </form>
     </section>
