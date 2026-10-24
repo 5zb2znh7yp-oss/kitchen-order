@@ -72,7 +72,7 @@ return () => {
 
 async function updateStatus(
 orderId: string,
-nextStatus: "cooking" | "ready" | "completed"
+nextStatus: "new" | "cooking" | "ready" | "completed"
 ) {
 setUpdatingId(orderId);
 
@@ -96,14 +96,11 @@ setUpdatingId(null);
 }
 
 async function cancelOrder(order: Order) {
-const itemsText = order.items
+const itemText = order.items
 .map((item) => `${item.name} × ${item.quantity}`)
-.join("\n");
-
-
 const message =
   `注文番号 ${String(order.order_number).padStart(3, "0")}\n\n` +
-  `${itemsText}\n\n` +
+  `${itemText}\n\n` +
   `合計 ¥${order.total_price.toLocaleString("ja-JP")}\n\n` +
   `この注文を取り消しますか？\n\n` +
   `取り消した注文は注文履歴には残りますが、売上には含まれません。`;
@@ -223,6 +220,8 @@ return (
           buttonText="調理完了"
           buttonClass="bg-orange-500 hover:bg-orange-600"
           nextStatus="ready"
+          backStatus="new"
+          backButtonText="新規に戻す"
           updatingId={updatingId}
           onUpdate={updateStatus}
           onCancel={cancelOrder}
@@ -238,6 +237,8 @@ return (
           buttonText="呼出済みにする"
           buttonClass="bg-green-600 hover:bg-green-700"
           nextStatus="completed"
+          backStatus="cooking"
+          backButtonText="調理中に戻す"
           updatingId={updatingId}
           onUpdate={updateStatus}
           onCancel={cancelOrder}
@@ -260,6 +261,8 @@ countClass,
 buttonText,
 buttonClass,
 nextStatus,
+backStatus,
+backButtonText,
 updatingId,
 onUpdate,
 onCancel,
@@ -273,16 +276,18 @@ countClass: string;
 buttonText: string;
 buttonClass: string;
 nextStatus: "cooking" | "ready" | "completed";
+backStatus?: "new" | "cooking";
+backButtonText?: string;
 updatingId: string | null;
 onUpdate: (
 orderId: string,
-nextStatus: "cooking" | "ready" | "completed"
+nextStatus: "new" | "cooking" | "ready" | "completed"
 ) => void;
 onCancel: (order: Order) => void;
 }) {
 return (
 <section className="overflow-hidden rounded-3xl bg-white shadow-sm">
-<div className={headerClass + " px-5 py-5 text-white md"}>
+<div className={headerClass + " px-5 py-5 text-white"}>
 <div className="flex items-center justify-between">
 <div>
 <h2 className="text-3xl font-black md:text-4xl">
@@ -325,6 +330,8 @@ return (
           buttonText={buttonText}
           buttonClass={buttonClass}
           nextStatus={nextStatus}
+          backStatus={backStatus}
+          backButtonText={backButtonText}
           updatingId={updatingId}
           onUpdate={onUpdate}
           onCancel={onCancel}
@@ -342,6 +349,8 @@ order,
 buttonText,
 buttonClass,
 nextStatus,
+backStatus,
+backButtonText,
 updatingId,
 onUpdate,
 onCancel,
@@ -350,10 +359,12 @@ order: Order;
 buttonText: string;
 buttonClass: string;
 nextStatus: "cooking" | "ready" | "completed";
+backStatus?: "new" | "cooking";
+backButtonText?: string;
 updatingId: string | null;
 onUpdate: (
 orderId: string,
-nextStatus: "cooking" | "ready" | "completed"
+nextStatus: "new" | "cooking" | "ready" | "completed"
 ) => void;
 onCancel: (order: Order) => void;
 }) {
@@ -429,6 +440,19 @@ return (
       ? "更新中..."
       : buttonText}
   </button>
+
+  {backStatus && backButtonText && (
+    <button
+      type="button"
+      onClick={() => onUpdate(order.id, backStatus)}
+      disabled={updatingId === order.id}
+      className="mt-3 min-h-[52px] w-full rounded-2xl border-2 border-slate-300 bg-white py-3 text-lg font-black text-slate-700 transition hover:bg-slate-100 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      {updatingId === order.id
+        ? "更新中..."
+        : backButtonText}
+    </button>
+  )}
 
   <button
     type="button"
