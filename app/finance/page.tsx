@@ -1,8 +1,7 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-
 import { supabase } from "@/lib/supabase";
 
 type Order = {
@@ -29,6 +28,11 @@ is_owner: boolean;
 can_manage_finance: boolean;
 };
 
+type LoggedInStaff = {
+id: string;
+displayName: string;
+};
+
 export default function FinancePage() {
 const router = useRouter();
 
@@ -37,23 +41,47 @@ const [hasPermission, setHasPermission] = useState(false);
 
 const [initialFunds, setInitialFunds] = useState(0);
 const [initialFundsInput, setInitialFundsInput] = useState("");
+
 const [totalSales, setTotalSales] = useState(0);
+
 const [materialCostItems, setMaterialCostItems] = useState<MaterialCostItem[]>([]);
 const [materialCost, setMaterialCost] = useState(0);
+
 const [materialNameInput, setMaterialNameInput] = useState("");
 const [materialAmountInput, setMaterialAmountInput] = useState("");
+
 const [editingMaterialId, setEditingMaterialId] = useState<string | null>(null);
+
 const [savingFunds, setSavingFunds] = useState(false);
 const [savingMaterial, setSavingMaterial] = useState(false);
 
 useEffect(() => {
 async function checkPermission() {
-const staffId =
-localStorage.getItem("currentStaffId") ||
-localStorage.getItem("staffId") ||
-localStorage.getItem("staff_id");
+const savedStaff = localStorage.getItem("kitchen-order-staff");
 
-  if (!staffId) {
+  if (!savedStaff) {
+    router.replace("/");
+    return;
+  }
+
+  let loggedInStaff: LoggedInStaff;
+
+  try {
+    const parsedStaff = JSON.parse(savedStaff);
+
+    if (!parsedStaff.id || !parsedStaff.displayName) {
+      localStorage.removeItem("kitchen-order-staff");
+      router.replace("/");
+      return;
+    }
+
+    loggedInStaff = {
+      id: parsedStaff.id,
+      displayName: parsedStaff.displayName,
+    };
+  } catch (error) {
+    console.error("ログインスタッフ情報の読み込みに失敗しました:", error);
+    localStorage.removeItem("kitchen-order-staff");
     router.replace("/");
     return;
   }
@@ -61,11 +89,18 @@ localStorage.getItem("staff_id");
   const { data, error } = await supabase
     .from("staff_profiles")
     .select("id, display_name, is_owner, can_manage_finance")
-    .eq("id", staffId)
+    .eq("id", loggedInStaff.id)
     .maybeSingle();
 
-  if (error || !data) {
+  if (error) {
     console.error("スタッフ権限確認エラー:", error);
+    window.alert("スタッフ権限を確認できませんでした。");
+    router.replace("/");
+    return;
+  }
+
+  if (!data) {
+    window.alert("スタッフ情報が見つかりません。");
     router.replace("/");
     return;
   }
@@ -207,7 +242,7 @@ const name = materialNameInput.trim();
 const amount = Number(materialAmountInput);
 
 if (!name) {
-  window.alert("材料名を入力してください。");
+  window.alert("材料費名を入力してください。");
   return;
 }
 
@@ -300,10 +335,10 @@ await loadMaterialCostItems();
 
 if (checkingPermission) {
 return (
-<main className="min-h-screen bg-slate-100 text-slate-900">
-<div className="flex min-h-screen items-center justify-center">
-<p className="text-xl font-black">
-権限を確認しています...
+<main className="min-h-screen bg-slate-100 p-6 text-slate-900">
+<div className="mx-auto max-w-4xl rounded-2xl bg-white p-8 text-center shadow-sm">
+<p className="text-lg font-black">
+資金管理の権限を確認しています...
 </p>
 </div>
 </main>
@@ -317,18 +352,26 @@ return null;
 const increasedFunds = totalSales - materialCost;
 const currentFunds = initialFunds + increasedFunds;
 
+const increaseRate =
+initialFunds > 0
+? Math.min(100, Math.max(0, (increasedFunds / initialFunds) * 100))
+: increasedFunds > 0
+? 100
+: 0;
+
 return (
-<main className="min-h-screen bg-slate-100 text-slate-900">
-<div className="mx-auto max-w-7xl px-4 py-6">
+<main className="min-h-screen bg-slate-100 px-4 py-6 text-slate-900">
+<div className="mx-auto max-w-7xl">
 <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
 <div>
 <h1 className="text-3xl font-black text-slate-900">
 資金管理
 </h1>
-<p className="mt-1 font-medium text-slate-600">
-売上と材料費から現在の資金を確認できます。
-</p>
-</div>
+
+        <p className="mt-1 font-medium text-slate-600">
+          売上と材料費から現在の資金を確認できます。
+        </p>
+      </div>
 
       <button
         type="button"
@@ -345,7 +388,7 @@ return (
       </h2>
 
       <p className="mt-1 text-sm font-medium text-slate-500">
-        開始時に持っていた資金を入力してください。
+        開始時点で持っていた資金を入力してください。
       </p>
 
       <div className="mt-4 flex flex-col gap-3 sm:flex-row">
@@ -400,7 +443,7 @@ return (
             onChange={(event) =>
               setMaterialNameInput(event.target.value)
             }
-            placeholder="材料名 例：麺"
+            placeholder="材料費名"
             className="rounded-xl border-2 border-slate-300 px-4 py-3 font-bold text-slate-900 outline-none focus:border-slate-900"
           />
 
@@ -451,31 +494,31 @@ return (
 
         <div className="mt-5 overflow-hidden rounded-xl border border-slate-200">
           {materialCostItems.length === 0 ? (
-            <div className="p-6 text-center">
-              <p className="font-bold text-slate-500">
-                材料費の内訳はまだ登録されていません
-              </p>
-            </div>
+            <p className="p-5 text-center font-bold text-slate-500">
+              材料費の登録はまだありません。
+            </p>
           ) : (
             <div className="divide-y divide-slate-200">
               {materialCostItems.map((item) => (
                 <div
                   key={item.id}
-                  className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
+                  className="flex flex-wrap items-center justify-between gap-3 p-4"
                 >
-                  <p className="text-lg font-black text-slate-900">
-                    {item.name}
-                  </p>
-
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="mr-2 text-lg font-black text-slate-900">
-                      ¥{item.amount.toLocaleString("ja-JP")}
+                  <div>
+                    <p className="font-black text-slate-900">
+                      {item.name}
                     </p>
 
+                    <p className="text-sm font-bold text-slate-500">
+                      ¥{item.amount.toLocaleString("ja-JP")}
+                    </p>
+                  </div>
+
+                  <div className="flex gap-2">
                     <button
                       type="button"
                       onClick={() => startEditMaterial(item)}
-                      className="rounded-lg bg-slate-200 px-3 py-2 text-sm font-black text-slate-800 hover:bg-slate-300"
+                      className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-black text-slate-800 hover:bg-slate-200"
                     >
                       編集
                     </button>
@@ -509,7 +552,7 @@ return (
 
       <div className="rounded-2xl bg-white p-5 shadow-sm">
         <p className="font-bold text-slate-600">
-          累計売上
+          総売上
         </p>
 
         <p className="mt-2 text-3xl font-black text-slate-900">
@@ -517,13 +560,13 @@ return (
         </p>
 
         <p className="mt-1 text-xs font-bold text-slate-500">
-          取消注文を除く
+          キャンセル済み注文を除外
         </p>
       </div>
 
       <div className="rounded-2xl bg-white p-5 shadow-sm">
         <p className="font-bold text-slate-600">
-          増加した金額
+          増えた金額
         </p>
 
         <p
@@ -552,13 +595,13 @@ return (
         </p>
 
         <p className="mt-1 text-xs font-bold text-slate-400">
-          もともとの資金 + 増加した金額
+          もともとの資金 + 増えた金額
         </p>
       </div>
     </section>
 
     <section className="mt-6 rounded-2xl bg-white p-5 shadow-sm">
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-black text-slate-900">
             資金の増加状況
@@ -569,7 +612,14 @@ return (
           </p>
         </div>
 
-        <p className="text-2xl font-black text-green-600">
+        <p
+          className={
+            "text-2xl font-black " +
+            (increasedFunds >= 0
+              ? "text-green-600"
+              : "text-red-600")
+          }
+        >
           ¥{increasedFunds.toLocaleString("ja-JP")}
         </p>
       </div>
@@ -578,18 +628,7 @@ return (
         <div
           className="h-full rounded-full bg-green-500 transition-all"
           style={{
-            width:
-              initialFunds > 0
-                ? Math.min(
-                    100,
-                    Math.max(
-                      0,
-                      (increasedFunds / initialFunds) * 100
-                    )
-                  ) + "%"
-                : increasedFunds > 0
-                  ? "100%"
-                  : "0%",
+            width: increaseRate + "%",
           }}
         />
       </div>

@@ -1,13 +1,13 @@
 ﻿"use client";
 
-import { FormEvent, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
-type Staff = {
+type StaffProfile = {
 id: string;
 display_name: string;
-created_at: string;
+is_owner: boolean;
+can_manage_finance: boolean;
 };
 
 type LoggedInStaff = {
@@ -16,475 +16,443 @@ displayName: string;
 };
 
 export default function StaffPage() {
-const router = useRouter();
-
-const [staff, setStaff] = useState<Staff[]>([]);
-const [loggedInStaff, setLoggedInStaff] =
-useState<LoggedInStaff | null>(null);
+const [staffList, setStaffList] = useState<StaffProfile[]>([]);
+const [displayNameInput, setDisplayNameInput] = useState("");
 const [selectedStaffId, setSelectedStaffId] = useState("");
-const [displayName, setDisplayName] = useState("");
-const [editingStaffId, setEditingStaffId] = useState("");
-const [editingName, setEditingName] = useState("");
+const [loggedInStaff, setLoggedInStaff] = useState<LoggedInStaff | null>(
+null
+);
 const [loading, setLoading] = useState(true);
 const [saving, setSaving] = useState(false);
-const [switching, setSwitching] = useState(false);
-const [updating, setUpdating] = useState(false);
-const [message, setMessage] = useState("");
-const [errorMessage, setErrorMessage] = useState("");
-
-useEffect(() => {
-loadStaff();
-loadLoggedInStaff();
-}, []);
 
 async function loadStaff() {
-setLoading(true);
-setErrorMessage("");
-
 const { data, error } = await supabase
-  .from("staff_profiles")
-  .select("id, display_name, created_at")
-  .order("display_name");
+.from("staff_profiles")
+.select("id, display_name, is_owner, can_manage_finance")
+.order("created_at", { ascending: true });
 
 if (error) {
-  console.error("スタッフ取得エラー:", error);
-  setErrorMessage("スタッフ情報を読み込めませんでした。");
-  setLoading(false);
+  console.error("スタッフ読み込みエラー:", error);
+  window.alert("スタッフ情報を読み込めませんでした。");
   return;
 }
 
-setStaff(data ?? []);
-setLoading(false);
+setStaffList((data ?? []) as StaffProfile[]);
 
 }
 
-function loadLoggedInStaff() {
+useEffect(() => {
 const savedStaff = localStorage.getItem("kitchen-order-staff");
 
-if (!savedStaff) {
-  setLoggedInStaff(null);
-  return;
-}
+if (savedStaff) {
+  try {
+    const parsed = JSON.parse(savedStaff);
 
-try {
-  const parsedStaff = JSON.parse(savedStaff);
-
-  if (parsedStaff.id && parsedStaff.displayName) {
-    setLoggedInStaff({
-      id: parsedStaff.id,
-      displayName: parsedStaff.displayName,
-    });
-    setSelectedStaffId(parsedStaff.id);
-  } else {
-    localStorage.removeItem("kitchen-order-staff");
-    setLoggedInStaff(null);
+    if (parsed.id && parsed.displayName) {
+      setLoggedInStaff({
+        id: parsed.id,
+        displayName: parsed.displayName,
+      });
+    }
+  } catch (error) {
+    console.error("ログインスタッフ情報の読み込みに失敗しました:", error);
   }
-} catch (error) {
-  console.error(
-    "ログインスタッフ情報の読み込みに失敗しました:",
-    error
-  );
-  localStorage.removeItem("kitchen-order-staff");
-  setLoggedInStaff(null);
 }
 
+async function initialize() {
+  await loadStaff();
+  setLoading(false);
 }
 
-async function handleRegister(event: FormEvent<HTMLFormElement>) {
-event.preventDefault();
+initialize();
 
-const trimmedName = displayName.trim();
+}, []);
 
-if (!trimmedName) {
-  setErrorMessage("スタッフ名を入力してください。");
-  return;
-}
-
-setSaving(true);
-setMessage("");
-setErrorMessage("");
-
-const { error } = await supabase
-  .from("staff_profiles")
-  .insert({
-    display_name: trimmedName,
-  });
-
-if (error) {
-  console.error("スタッフ登録エラー:", error);
-
-  if (error.code === "23505") {
-    setErrorMessage(
-      "同じ名前のスタッフがすでに登録されています。"
-    );
-  } else {
-    setErrorMessage("スタッフ登録に失敗しました。");
-  }
-
-  setSaving(false);
-  return;
-}
-
-setDisplayName("");
-setMessage("スタッフを登録しました。");
-await loadStaff();
-setSaving(false);
-
-}
-
-function startEditingStaff(person: Staff) {
-setEditingStaffId(person.id);
-setEditingName(person.display_name);
-setMessage("");
-setErrorMessage("");
-}
-
-function cancelEditingStaff() {
-setEditingStaffId("");
-setEditingName("");
-}
-
-async function handleUpdateStaffName(staffId: string) {
-const trimmedName = editingName.trim();
-
-if (!trimmedName) {
-  setErrorMessage("スタッフ名を入力してください。");
-  return;
-}
-
-setUpdating(true);
-setMessage("");
-setErrorMessage("");
-
-const { error } = await supabase
-  .from("staff_profiles")
-  .update({
-    display_name: trimmedName,
-  })
-  .eq("id", staffId);
-
-if (error) {
-  console.error("スタッフ名変更エラー:", error);
-
-  if (error.code === "23505") {
-    setErrorMessage(
-      "同じ名前のスタッフがすでに登録されています。"
-    );
-  } else {
-    setErrorMessage("スタッフ名の変更に失敗しました。");
-  }
-
-  setUpdating(false);
-  return;
-}
-
-if (loggedInStaff?.id === staffId) {
-  const updatedLoggedInStaff = {
-    id: staffId,
-    displayName: trimmedName,
-  };
-
-  localStorage.setItem(
-    "kitchen-order-staff",
-    JSON.stringify(updatedLoggedInStaff)
-  );
-
-  setLoggedInStaff(updatedLoggedInStaff);
-}
-
-setEditingStaffId("");
-setEditingName("");
-setMessage("スタッフ名を変更しました。");
-
-await loadStaff();
-
-setUpdating(false);
-
-}
-
-function handleSwitchStaff() {
-setMessage("");
-setErrorMessage("");
-
-if (!selectedStaffId) {
-  setErrorMessage("スタッフを選択してください。");
-  return;
-}
-
-const selectedStaff = staff.find(
-  (person) => person.id === selectedStaffId
+const currentStaff = staffList.find(
+(staff) => staff.id === loggedInStaff?.id
 );
 
-if (!selectedStaff) {
-  setErrorMessage("スタッフ情報が見つかりません。");
-  return;
-}
+const isOwner = currentStaff?.is_owner === true;
 
-setSwitching(true);
-
-const newLoggedInStaff = {
-  id: selectedStaff.id,
-  displayName: selectedStaff.display_name,
+function switchStaff(staff: StaffProfile) {
+const staffData = {
+id: staff.id,
+displayName: staff.display_name,
 };
 
 localStorage.setItem(
   "kitchen-order-staff",
-  JSON.stringify(newLoggedInStaff)
+  JSON.stringify(staffData)
 );
 
-setLoggedInStaff(newLoggedInStaff);
-setSwitching(false);
+setLoggedInStaff(staffData);
+window.location.reload();
 
-router.push("/");
+}
 
+async function registerStaff() {
+const name = displayNameInput.trim();
+
+if (!name) {
+  window.alert("スタッフ名を入力してください。");
+  return;
+}
+
+setSaving(true);
+
+const { data, error } = await supabase
+  .from("staff_profiles")
+  .insert({
+    display_name: name,
+  })
+  .select("id, display_name, is_owner, can_manage_finance")
+  .single();
+
+if (error) {
+  console.error("スタッフ登録エラー:", error);
+  window.alert("スタッフを登録できませんでした。");
+  setSaving(false);
+  return;
+}
+
+setDisplayNameInput("");
+setSaving(false);
+
+await loadStaff();
+
+if (!loggedInStaff && data) {
+  switchStaff(data as StaffProfile);
+  return;
+}
+
+window.alert("スタッフを登録しました。");
+
+}
+
+async function changeDisplayName() {
+if (!selectedStaffId) {
+window.alert("変更するスタッフを選択してください。");
+return;
+}
+
+const staff = staffList.find(
+  (item) => item.id === selectedStaffId
+);
+
+if (!staff) {
+  return;
+}
+
+const newName = window.prompt(
+  "新しいスタッフ名を入力してください。",
+  staff.display_name
+);
+
+if (newName === null) {
+  return;
+}
+
+const name = newName.trim();
+
+if (!name) {
+  window.alert("スタッフ名を入力してください。");
+  return;
+}
+
+const { error } = await supabase
+  .from("staff_profiles")
+  .update({
+    display_name: name,
+  })
+  .eq("id", selectedStaffId);
+
+if (error) {
+  console.error("スタッフ名変更エラー:", error);
+  window.alert("スタッフ名を変更できませんでした。");
+  return;
+}
+
+await loadStaff();
+
+if (loggedInStaff?.id === selectedStaffId) {
+  const updatedStaff = {
+    id: selectedStaffId,
+    displayName: name,
+  };
+
+  localStorage.setItem(
+    "kitchen-order-staff",
+    JSON.stringify(updatedStaff)
+  );
+
+  setLoggedInStaff(updatedStaff);
+}
+
+setSelectedStaffId("");
+window.alert("スタッフ名を変更しました。");
+
+}
+
+async function setOwner(staff: StaffProfile) {
+if (!isOwner) {
+window.alert("主だけが管理者を変更できます。");
+return;
+}
+
+const pin = window.prompt("主PINを入力してください。");
+
+if (pin === null) {
+  return;
+}
+
+const { data, error } = await supabase.rpc(
+  "change_staff_permissions",
+  {
+    input_pin: pin,
+    target_staff_id: staff.id,
+    make_owner: true,
+    allow_finance: true,
+  }
+);
+
+if (error) {
+  console.error("主変更エラー:", error);
+  window.alert("主の変更に失敗しました。");
+  return;
+}
+
+if (data !== true) {
+  window.alert("PINが正しくありません。");
+  return;
+}
+
+await loadStaff();
+
+window.alert(
+  staff.display_name + " さんを主に変更しました。"
+);
+
+}
+
+async function toggleFinance(staff: StaffProfile) {
+if (!isOwner) {
+window.alert("主だけが資金管理権限を変更できます。");
+return;
+}
+
+if (staff.is_owner) {
+  window.alert("主は資金管理を利用できます。");
+  return;
+}
+
+const pin = window.prompt("主PINを入力してください。");
+
+if (pin === null) {
+  return;
+}
+
+const { data, error } = await supabase.rpc(
+  "change_staff_permissions",
+  {
+    input_pin: pin,
+    target_staff_id: staff.id,
+    make_owner: false,
+    allow_finance: !staff.can_manage_finance,
+  }
+);
+
+if (error) {
+  console.error("資金管理権限変更エラー:", error);
+  window.alert("資金管理権限の変更に失敗しました。");
+  return;
+}
+
+if (data !== true) {
+  window.alert("PINが正しくありません。");
+  return;
+}
+
+await loadStaff();
+
+}
+
+if (loading) {
+return (
+<main className="min-h-screen bg-slate-100 text-slate-900">
+<div className="flex min-h-screen items-center justify-center">
+<p className="text-xl font-black">
+スタッフ情報を読み込んでいます...
+</p>
+</div>
+</main>
+);
 }
 
 return (
 <main className="min-h-screen bg-slate-100 text-slate-900">
-<header className="bg-slate-900 text-white">
-<div className="mx-auto max-w-7xl px-4 py-4">
-<div>
-<p className="text-sm font-bold text-slate-300">
-Store System
-</p>
-<h1 className="text-2xl font-black">
+<div className="mx-auto max-w-7xl px-4 py-6">
+<div className="mb-6">
+<h1 className="text-3xl font-black text-slate-900">
 スタッフ管理
 </h1>
+<p className="mt-1 font-medium text-slate-600">
+スタッフの登録、名前変更、主・資金管理権限を管理します。
+</p>
 </div>
-</div>
-</header>
 
-  <div className="mx-auto max-w-5xl px-4 py-6 md:px-6">
-    {message && (
-      <div className="mb-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 font-bold text-emerald-700">
-        {message}
-      </div>
-    )}
+    <section className="mb-6 rounded-2xl bg-white p-5 shadow-sm">
+      <h2 className="text-xl font-black text-slate-900">
+        現在のスタッフ
+      </h2>
 
-    {errorMessage && (
-      <div className="mb-5 rounded-2xl border border-red-200 bg-red-50 p-4 font-bold text-red-700">
-        {errorMessage}
-      </div>
-    )}
+      {loggedInStaff ? (
+        <div className="mt-4 rounded-xl bg-slate-100 p-4">
+          <p className="text-sm font-bold text-slate-500">
+            現在ログイン中
+          </p>
+          <p className="mt-1 text-2xl font-black text-slate-900">
+            {loggedInStaff.displayName}
+          </p>
 
-    <div className="grid gap-6 md:grid-cols-2">
-      <section className="rounded-3xl bg-white p-6 shadow-sm">
-        <p className="text-sm font-black text-slate-500">
-          現在ログイン中のスタッフ
-        </p>
-
-        <div className="mt-4 rounded-2xl bg-slate-900 p-5 text-white">
-          {loggedInStaff ? (
-            <>
-              <p className="text-2xl font-black">
-                {loggedInStaff.displayName}
-              </p>
-
-              <p className="mt-1 text-sm font-bold text-slate-300">
-                現在このスタッフで注文を受け付けています
-              </p>
-            </>
+          {isOwner ? (
+            <p className="mt-2 font-black text-blue-600">
+              主
+            </p>
+          ) : currentStaff?.can_manage_finance ? (
+            <p className="mt-2 font-black text-green-600">
+              資金管理権限あり
+            </p>
           ) : (
-            <>
-              <p className="text-lg font-black">
-                未ログイン
-              </p>
-
-              <p className="mt-1 text-sm font-bold text-slate-300">
-                下のスタッフ切り替えから選択してください
-              </p>
-            </>
+            <p className="mt-2 font-bold text-slate-500">
+              スタッフ
+            </p>
           )}
         </div>
-      </section>
-
-      <section className="rounded-3xl bg-white p-6 shadow-sm">
-        <h2 className="text-xl font-black text-slate-900">
-          スタッフを切り替える
-        </h2>
-
-        <p className="mt-2 text-sm font-bold text-slate-500">
-          登録されているスタッフから選択してください。
-        </p>
-
-        <select
-          value={selectedStaffId}
-          onChange={(event) => {
-            setSelectedStaffId(event.target.value);
-            setMessage("");
-            setErrorMessage("");
-          }}
-          className="mt-5 w-full rounded-2xl border-2 border-slate-300 bg-white px-4 py-4 text-lg font-black text-slate-900 outline-none focus:border-slate-900"
-        >
-          <option value="">スタッフを選択</option>
-
-          {staff.map((person) => (
-            <option key={person.id} value={person.id}>
-              {person.display_name}
-            </option>
-          ))}
-        </select>
-
-        <button
-          type="button"
-          onClick={handleSwitchStaff}
-          disabled={!selectedStaffId || switching}
-          className="mt-4 w-full rounded-2xl bg-slate-900 px-5 py-4 text-lg font-black text-white hover:bg-slate-800 disabled:bg-slate-300"
-        >
-          {switching
-            ? "切り替え中..."
-            : "このスタッフでログイン"}
-        </button>
-      </section>
-    </div>
-
-    <section className="mt-6 rounded-3xl bg-white p-6 shadow-sm">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-black text-slate-900">
-            登録されているスタッフ
-          </h2>
-
-          <p className="mt-1 text-sm font-bold text-slate-500">
-            {staff.length}人登録されています
-          </p>
-        </div>
-      </div>
-
-      {loading ? (
-        <div className="mt-5 rounded-2xl bg-slate-100 p-6 text-center">
-          <p className="font-bold text-slate-600">
-            スタッフ情報を読み込んでいます...
-          </p>
-        </div>
-      ) : staff.length === 0 ? (
-        <div className="mt-5 rounded-2xl bg-slate-100 p-6 text-center">
-          <p className="font-bold text-slate-600">
-            登録されているスタッフはいません。
-          </p>
-        </div>
       ) : (
-        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {staff.map((person) => {
-            const isLoggedIn =
-              loggedInStaff?.id === person.id;
-
-            const isEditing =
-              editingStaffId === person.id;
-
-            return (
-              <div
-                key={person.id}
-                className={
-                  "rounded-2xl border-2 p-4 " +
-                  (isLoggedIn
-                    ? "border-emerald-300 bg-emerald-50"
-                    : "border-slate-200 bg-white")
-                }
-              >
-                {isEditing ? (
-                  <>
-                    <input
-                      type="text"
-                      value={editingName}
-                      onChange={(event) =>
-                        setEditingName(event.target.value)
-                      }
-                      className="w-full rounded-xl border-2 border-slate-300 bg-white px-3 py-3 font-black text-slate-900 outline-none focus:border-slate-900"
-                      autoFocus
-                    />
-
-                    <div className="mt-3 flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          handleUpdateStaffName(person.id)
-                        }
-                        disabled={updating}
-                        className="flex-1 rounded-xl bg-slate-900 px-3 py-3 text-sm font-black text-white hover:bg-slate-800 disabled:bg-slate-300"
-                      >
-                        {updating
-                          ? "保存中..."
-                          : "保存"}
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={cancelEditingStaff}
-                        disabled={updating}
-                        className="rounded-xl bg-slate-200 px-3 py-3 text-sm font-black text-slate-700 hover:bg-slate-300"
-                      >
-                        戻す
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="flex items-center justify-between gap-3">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setSelectedStaffId(person.id)
-                        }
-                        className="text-left font-black text-slate-900"
-                      >
-                        {person.display_name}
-                      </button>
-
-                      {isLoggedIn && (
-                        <span className="whitespace-nowrap rounded-full bg-emerald-100 px-3 py-1 text-xs font-black text-emerald-700">
-                          ログイン中
-                        </span>
-                      )}
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        startEditingStaff(person)
-                      }
-                      className="mt-3 w-full rounded-xl bg-slate-100 px-3 py-2 text-sm font-black text-slate-700 hover:bg-slate-200"
-                    >
-                      名前を変更
-                    </button>
-                  </>
-                )}
-              </div>
-            );
-          })}
-        </div>
+        <p className="mt-4 font-bold text-slate-500">
+          まだスタッフが選択されていません。
+        </p>
       )}
     </section>
 
-    <section className="mt-6 rounded-3xl bg-white p-6 shadow-sm">
+    <section className="mb-6 rounded-2xl bg-white p-5 shadow-sm">
       <h2 className="text-xl font-black text-slate-900">
-        新しいスタッフを登録
+        スタッフ登録
       </h2>
 
-      <form
-        onSubmit={handleRegister}
-        className="mt-4 flex flex-col gap-3 sm:flex-row"
-      >
+      <div className="mt-4 flex flex-col gap-3 sm:flex-row">
         <input
           type="text"
-          value={displayName}
+          value={displayNameInput}
           onChange={(event) =>
-            setDisplayName(event.target.value)
+            setDisplayNameInput(event.target.value)
           }
-          placeholder="スタッフ名を入力"
-          className="flex-1 rounded-2xl border-2 border-slate-300 px-4 py-4 font-bold outline-none focus:border-slate-900"
+          placeholder="スタッフ名"
+          className="flex-1 rounded-xl border-2 border-slate-300 bg-white px-4 py-3 font-bold text-slate-900 outline-none focus:border-slate-900"
         />
 
         <button
-          type="submit"
+          type="button"
+          onClick={registerStaff}
           disabled={saving}
-          className="rounded-2xl bg-slate-900 px-6 py-4 font-black text-white hover:bg-slate-800 disabled:bg-slate-300"
+          className="rounded-xl bg-blue-600 px-6 py-3 font-black text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
         >
-          {saving
-            ? "登録中..."
-            : "スタッフを登録"}
+          {saving ? "登録中..." : "スタッフを登録"}
         </button>
-      </form>
+      </div>
+    </section>
+
+    <section className="rounded-2xl bg-white shadow-sm">
+      <div className="border-b border-slate-200 p-5">
+        <h2 className="text-xl font-black text-slate-900">
+          スタッフ一覧
+        </h2>
+      </div>
+
+      <div className="divide-y divide-slate-200">
+        {staffList.map((staff) => (
+          <div
+            key={staff.id}
+            className="flex flex-col gap-4 p-5 lg:flex-row lg:items-center lg:justify-between"
+          >
+            <div>
+              <p className="text-xl font-black text-slate-900">
+                {staff.display_name}
+              </p>
+
+              <div className="mt-2 flex flex-wrap gap-2">
+                {staff.is_owner ? (
+                  <span className="rounded-full bg-blue-100 px-3 py-1 text-sm font-black text-blue-700">
+                    主
+                  </span>
+                ) : (
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-black text-slate-600">
+                    スタッフ
+                  </span>
+                )}
+
+                {staff.can_manage_finance ? (
+                  <span className="rounded-full bg-green-100 px-3 py-1 text-sm font-black text-green-700">
+                    資金管理OK
+                  </span>
+                ) : (
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-black text-slate-500">
+                    資金管理なし
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => switchStaff(staff)}
+                className="rounded-xl bg-slate-900 px-4 py-3 font-black text-white hover:bg-slate-700"
+              >
+                このスタッフに切替
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSelectedStaffId(staff.id)}
+                className="rounded-xl bg-slate-200 px-4 py-3 font-black text-slate-800 hover:bg-slate-300"
+              >
+                名前変更
+              </button>
+
+              {isOwner && !staff.is_owner ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setOwner(staff)}
+                    className="rounded-xl bg-blue-100 px-4 py-3 font-black text-blue-700 hover:bg-blue-200"
+                  >
+                    主にする
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => toggleFinance(staff)}
+                    className="rounded-xl bg-green-100 px-4 py-3 font-black text-green-700 hover:bg-green-200"
+                  >
+                    {staff.can_manage_finance
+                      ? "資金管理をOFF"
+                      : "資金管理をON"}
+                  </button>
+                </>
+              ) : null}
+            </div>
+          </div>
+        ))}
+
+        {staffList.length === 0 ? (
+          <div className="p-8 text-center">
+            <p className="font-bold text-slate-500">
+              スタッフがまだ登録されていません。
+            </p>
+          </div>
+        ) : null}
+      </div>
     </section>
   </div>
 </main>
