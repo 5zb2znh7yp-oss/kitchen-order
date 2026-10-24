@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+
 import { supabase } from "@/lib/supabase";
 
 type Order = {
@@ -20,19 +22,69 @@ amount: number;
 created_at: string;
 };
 
+type StaffProfile = {
+id: string;
+display_name: string;
+is_owner: boolean;
+can_manage_finance: boolean;
+};
+
 export default function FinancePage() {
+const router = useRouter();
+
+const [checkingPermission, setCheckingPermission] = useState(true);
+const [hasPermission, setHasPermission] = useState(false);
+
 const [initialFunds, setInitialFunds] = useState(0);
 const [initialFundsInput, setInitialFundsInput] = useState("");
 const [totalSales, setTotalSales] = useState(0);
 const [materialCostItems, setMaterialCostItems] = useState<MaterialCostItem[]>([]);
 const [materialCost, setMaterialCost] = useState(0);
-
 const [materialNameInput, setMaterialNameInput] = useState("");
 const [materialAmountInput, setMaterialAmountInput] = useState("");
 const [editingMaterialId, setEditingMaterialId] = useState<string | null>(null);
-
 const [savingFunds, setSavingFunds] = useState(false);
 const [savingMaterial, setSavingMaterial] = useState(false);
+
+useEffect(() => {
+async function checkPermission() {
+const staffId =
+localStorage.getItem("currentStaffId") ||
+localStorage.getItem("staffId") ||
+localStorage.getItem("staff_id");
+
+  if (!staffId) {
+    router.replace("/");
+    return;
+  }
+
+  const { data, error } = await supabase
+    .from("staff_profiles")
+    .select("id, display_name, is_owner, can_manage_finance")
+    .eq("id", staffId)
+    .maybeSingle();
+
+  if (error || !data) {
+    console.error("スタッフ権限確認エラー:", error);
+    router.replace("/");
+    return;
+  }
+
+  const staff = data as StaffProfile;
+
+  if (!staff.is_owner && !staff.can_manage_finance) {
+    window.alert("資金管理を利用する権限がありません。");
+    router.replace("/");
+    return;
+  }
+
+  setHasPermission(true);
+  setCheckingPermission(false);
+}
+
+checkPermission();
+
+}, [router]);
 
 async function loadFinanceSettings() {
 const { data, error } = await supabase
@@ -68,7 +120,10 @@ const orders = (data ?? []) as Order[];
 
 const sales = orders
   .filter((order) => order.status !== "cancelled")
-  .reduce((sum, order) => sum + Number(order.total_price || 0), 0);
+  .reduce(
+    (sum, order) => sum + Number(order.total_price || 0),
+    0
+  );
 
 setTotalSales(sales);
 
@@ -107,8 +162,13 @@ loadMaterialCostItems(),
 }
 
 useEffect(() => {
+if (!hasPermission) {
+return;
+}
+
 loadAll();
-}, []);
+
+}, [hasPermission]);
 
 async function saveInitialFunds() {
 const value = Number(initialFundsInput);
@@ -238,6 +298,22 @@ await loadMaterialCostItems();
 
 }
 
+if (checkingPermission) {
+return (
+<main className="min-h-screen bg-slate-100 text-slate-900">
+<div className="flex min-h-screen items-center justify-center">
+<p className="text-xl font-black">
+権限を確認しています...
+</p>
+</div>
+</main>
+);
+}
+
+if (!hasPermission) {
+return null;
+}
+
 const increasedFunds = totalSales - materialCost;
 const currentFunds = initialFunds + increasedFunds;
 
@@ -249,11 +325,10 @@ return (
 <h1 className="text-3xl font-black text-slate-900">
 資金管理
 </h1>
-
-        <p className="mt-1 font-medium text-slate-600">
-          売上と材料費から現在の資金を確認できます。
-        </p>
-      </div>
+<p className="mt-1 font-medium text-slate-600">
+売上と材料費から現在の資金を確認できます。
+</p>
+</div>
 
       <button
         type="button"
