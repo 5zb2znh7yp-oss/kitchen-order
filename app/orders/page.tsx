@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-
 import { supabase } from "@/lib/supabase";
 
 type OrderItem = {
@@ -40,6 +39,12 @@ type StaffSales = {
 name: string;
 orderCount: number;
 sales: number;
+};
+
+type FinanceSettings = {
+id: number;
+initial_funds: number;
+material_cost: number;
 };
 
 function statusLabel(status: OrderStatus) {
@@ -123,6 +128,12 @@ const [loading, setLoading] = useState(true);
 const [selectedDate, setSelectedDate] = useState("");
 const [deletingOrderId, setDeletingOrderId] = useState<string | null>(null);
 
+const [initialFunds, setInitialFunds] = useState(0);
+const [materialCost, setMaterialCost] = useState(0);
+const [initialFundsInput, setInitialFundsInput] = useState("");
+const [materialCostInput, setMaterialCostInput] = useState("");
+const [savingFinance, setSavingFinance] = useState(false);
+
 const loadOrders = useCallback(async () => {
 setLoading(true);
 
@@ -144,13 +155,83 @@ setLoading(false);
 
 }, []);
 
+const loadFinanceSettings = useCallback(async () => {
+const { data, error } = await supabase
+.from("finance_settings")
+.select("id, initial_funds, material_cost")
+.eq("id", 1)
+.maybeSingle();
+
+if (error) {
+  console.error("資金設定取得エラー:", error);
+  return;
+}
+
+if (data) {
+  const settings = data as FinanceSettings;
+
+  setInitialFunds(settings.initial_funds);
+  setMaterialCost(settings.material_cost);
+  setInitialFundsInput(String(settings.initial_funds));
+  setMaterialCostInput(String(settings.material_cost));
+}
+
+}, []);
+
 useEffect(() => {
 setSelectedDate(getTodayKey());
 }, []);
 
 useEffect(() => {
 loadOrders();
-}, [loadOrders]);
+loadFinanceSettings();
+}, [loadOrders, loadFinanceSettings]);
+
+async function saveFinanceSettings() {
+const nextInitialFunds = Number(initialFundsInput);
+const nextMaterialCost = Number(materialCostInput);
+
+if (
+  !Number.isInteger(nextInitialFunds) ||
+  nextInitialFunds < 0
+) {
+  window.alert("もともとの資金は0円以上の整数で入力してください。");
+  return;
+}
+
+if (
+  !Number.isInteger(nextMaterialCost) ||
+  nextMaterialCost < 0
+) {
+  window.alert("材料費は0円以上の整数で入力してください。");
+  return;
+}
+
+setSavingFinance(true);
+
+const { error } = await supabase
+  .from("finance_settings")
+  .update({
+    initial_funds: nextInitialFunds,
+    material_cost: nextMaterialCost,
+    updated_at: new Date().toISOString(),
+  })
+  .eq("id", 1);
+
+if (error) {
+  console.error("資金設定保存エラー:", error);
+  window.alert("資金設定を保存できませんでした。");
+  setSavingFinance(false);
+  return;
+}
+
+setInitialFunds(nextInitialFunds);
+setMaterialCost(nextMaterialCost);
+setSavingFinance(false);
+
+window.alert("資金設定を保存しました。");
+
+}
 
 async function handleDeleteOrder(orderId: string) {
 const targetOrder = orders.find((order) => order.id === orderId);
@@ -160,10 +241,9 @@ if (!targetOrder) {
 }
 
 const confirmed = window.confirm(
-  `整理番号 ${String(targetOrder.order_number).padStart(
-    3,
-    "0"
-  )} の注文を履歴から削除しますか？\n\nこの操作は元に戻せません。`
+  "整理番号 " +
+    String(targetOrder.order_number).padStart(3, "0") +
+    " の注文を履歴から削除しますか？\n\nこの操作は元に戻せません。"
 );
 
 if (!confirmed) {
@@ -215,6 +295,27 @@ validSelectedDateOrders.length > 0
 selectedDateSales / validSelectedDateOrders.length
 )
 : 0;
+
+const allValidOrders = orders.filter(
+(order) => order.status !== "cancelled"
+);
+
+const totalSales = allValidOrders.reduce(
+(sum, order) => sum + order.total_price,
+0
+);
+
+const increasedFunds = totalSales - materialCost;
+const currentFunds = initialFunds + increasedFunds;
+
+const maxFinanceValue = Math.max(
+initialFunds,
+materialCost,
+totalSales,
+Math.abs(increasedFunds),
+Math.abs(currentFunds),
+1
+);
 
 const productSalesMap: Record<string, ProductSales> = {};
 
@@ -277,7 +378,10 @@ return (
 
       <button
         type="button"
-        onClick={loadOrders}
+        onClick={() => {
+          loadOrders();
+          loadFinanceSettings();
+        }}
         className="rounded-xl bg-slate-900 px-5 py-3 font-black text-white hover:bg-slate-800"
       >
         更新
@@ -304,6 +408,205 @@ return (
         />
       </div>
     </div>
+
+    <section className="mb-6 overflow-hidden rounded-2xl bg-white shadow-sm">
+      <div className="border-b border-slate-200 bg-slate-900 px-5 py-5">
+        <h2 className="text-2xl font-black text-white">
+          資金管理
+        </h2>
+
+        <p className="mt-1 text-sm font-medium text-slate-300">
+          売上は注文履歴から自動集計し、材料費は合計金額で管理します。
+        </p>
+      </div>
+
+      <div className="grid gap-4 p-5 md:grid-cols-2">
+        <div className="rounded-2xl bg-slate-50 p-5">
+          <label className="block">
+            <span className="font-black text-slate-800">
+              もともとの資金
+            </span>
+
+            <span className="mt-1 block text-sm font-medium text-slate-500">
+              開始時に持っていた資金
+            </span>
+
+            <div className="mt-3 flex items-center gap-2">
+              <span className="text-xl font-black text-slate-700">
+                ¥
+              </span>
+
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={initialFundsInput}
+                onChange={(event) =>
+                  setInitialFundsInput(event.target.value)
+                }
+                className="w-full rounded-xl border-2 border-slate-300 bg-white px-4 py-3 text-xl font-black text-slate-900 outline-none focus:border-slate-900"
+              />
+            </div>
+          </label>
+        </div>
+
+        <div className="rounded-2xl bg-slate-50 p-5">
+          <label className="block">
+            <span className="font-black text-slate-800">
+              材料費の合計
+            </span>
+
+            <span className="mt-1 block text-sm font-medium text-slate-500">
+              これまでに使った材料費の合計
+            </span>
+
+            <div className="mt-3 flex items-center gap-2">
+              <span className="text-xl font-black text-slate-700">
+                ¥
+              </span>
+
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={materialCostInput}
+                onChange={(event) =>
+                  setMaterialCostInput(event.target.value)
+                }
+                className="w-full rounded-xl border-2 border-slate-300 bg-white px-4 py-3 text-xl font-black text-slate-900 outline-none focus:border-slate-900"
+              />
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <div className="px-5 pb-5">
+        <button
+          type="button"
+          onClick={saveFinanceSettings}
+          disabled={savingFinance}
+          className="w-full rounded-xl bg-blue-600 px-5 py-4 font-black text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
+        >
+          {savingFinance ? "保存中..." : "資金設定を保存"}
+        </button>
+      </div>
+
+      <div className="grid gap-4 border-t border-slate-200 p-5 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="rounded-2xl bg-slate-50 p-5">
+          <p className="font-bold text-slate-600">
+            もともとの資金
+          </p>
+
+          <p className="mt-2 text-3xl font-black text-slate-900">
+            ¥{initialFunds.toLocaleString("ja-JP")}
+          </p>
+        </div>
+
+        <div className="rounded-2xl bg-slate-50 p-5">
+          <p className="font-bold text-slate-600">
+            累計売上
+          </p>
+
+          <p className="mt-2 text-3xl font-black text-slate-900">
+            ¥{totalSales.toLocaleString("ja-JP")}
+          </p>
+
+          <p className="mt-1 text-xs font-bold text-slate-500">
+            取消注文を除く
+          </p>
+        </div>
+
+        <div className="rounded-2xl bg-slate-50 p-5">
+          <p className="font-bold text-slate-600">
+            材料費
+          </p>
+
+          <p className="mt-2 text-3xl font-black text-red-600">
+            -¥{materialCost.toLocaleString("ja-JP")}
+          </p>
+        </div>
+
+        <div className="rounded-2xl bg-green-50 p-5">
+          <p className="font-bold text-green-700">
+            増えた金額
+          </p>
+
+          <p
+            className={
+              "mt-2 text-3xl font-black " +
+              (increasedFunds >= 0
+                ? "text-green-700"
+                : "text-red-600")
+            }
+          >
+            {increasedFunds >= 0 ? "+" : "-"}¥
+            {Math.abs(increasedFunds).toLocaleString("ja-JP")}
+          </p>
+        </div>
+      </div>
+
+      <div className="border-t border-slate-200 bg-slate-50 p-5">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="font-bold text-slate-600">
+              現在の資金
+            </p>
+
+            <p className="mt-1 text-sm font-medium text-slate-500">
+              もともとの資金 ＋ 売上 − 材料費
+            </p>
+          </div>
+
+          <p
+            className={
+              "text-4xl font-black " +
+              (currentFunds >= 0
+                ? "text-slate-900"
+                : "text-red-600")
+            }
+          >
+            ¥{currentFunds.toLocaleString("ja-JP")}
+          </p>
+        </div>
+
+        <div className="mt-5">
+          <div className="mb-2 flex justify-between text-sm font-bold text-slate-600">
+            <span>資金の変化</span>
+            <span>
+              {currentFunds >= initialFunds ? "増加" : "減少"}
+            </span>
+          </div>
+
+          <div className="h-8 overflow-hidden rounded-full bg-slate-200">
+            <div
+              className="h-full rounded-full bg-green-500 transition-all"
+              style={{
+                width:
+                  currentFunds > 0
+                    ? Math.min(
+                        100,
+                        Math.max(
+                          5,
+                          (currentFunds / maxFinanceValue) * 100
+                        )
+                      ) + "%"
+                    : "0%",
+              }}
+            />
+          </div>
+
+          <div className="mt-2 flex justify-between text-xs font-bold text-slate-500">
+            <span>
+              開始 ¥{initialFunds.toLocaleString("ja-JP")}
+            </span>
+
+            <span>
+              現在 ¥{currentFunds.toLocaleString("ja-JP")}
+            </span>
+          </div>
+        </div>
+      </div>
+    </section>
 
     <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <div className="rounded-2xl bg-white p-6 shadow-sm">
