@@ -46,18 +46,21 @@ loadStaff();
 const savedStaff = localStorage.getItem("kitchen-order-staff");
 
 if (savedStaff) {
-try {
-const parsedStaff = JSON.parse(savedStaff);
+  try {
+    const parsedStaff = JSON.parse(savedStaff);
 
-  if (parsedStaff.displayName) {
-    setSelectedStaffName(parsedStaff.displayName);
+    if (parsedStaff.displayName) {
+      setSelectedStaffName(parsedStaff.displayName);
+    }
+  } catch (error) {
+    console.error(
+      "保存されたスタッフ情報の読み込みに失敗しました:",
+      error
+    );
+    localStorage.removeItem("kitchen-order-staff");
   }
-} catch (error) {
-  console.error("保存されたスタッフ情報の読み込みに失敗しました:", error);
-  localStorage.removeItem("kitchen-order-staff");
 }
 
-}
 }, []);
 
 async function loadProducts() {
@@ -307,6 +310,7 @@ return (
           <p className="text-sm font-black text-slate-600">
             担当スタッフ
           </p>
+
           <p className="mt-1 text-2xl font-black text-blue-700">
             {receipt.staffName}
           </p>
@@ -339,10 +343,7 @@ return (
             </span>
 
             <span className="text-xl font-black text-slate-950">
-              ¥
-              {receipt.cashReceived.toLocaleString(
-                "ja-JP"
-              )}
+              ¥{receipt.cashReceived.toLocaleString("ja-JP")}
             </span>
           </div>
 
@@ -663,10 +664,7 @@ return (
                       : "text-slate-500")
                   }
                 >
-                  ¥
-                  {Math.max(0, change).toLocaleString(
-                    "ja-JP"
-                  )}
+                  ¥{Math.max(0, change).toLocaleString("ja-JP")}
                 </span>
               </div>
             </div>

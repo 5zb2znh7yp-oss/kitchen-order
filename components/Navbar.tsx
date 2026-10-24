@@ -10,6 +10,7 @@ const links = [
 { href: "/orders", label: "注文履歴・売上" },
 { href: "/products", label: "商品管理" },
 { href: "/staff", label: "スタッフ管理" },
+{ href: "/finance", label: "資金管理" },
 ];
 
 export default function Navbar() {
