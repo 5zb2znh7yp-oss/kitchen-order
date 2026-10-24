@@ -72,9 +72,7 @@ if (error) {
 
 setName("");
 setPrice("");
-
 await loadProducts();
-
 setSaving(false);
 
 }
@@ -152,38 +150,39 @@ async function deleteProduct(product: Product) {
 const confirmed = window.confirm("商品を削除しますか？");
 
 if (!confirmed) {
-return;
+  return;
 }
 
 const { error } = await supabase
-.from("products")
-.delete()
-.eq("id", product.id);
+  .from("products")
+  .delete()
+  .eq("id", product.id);
 
 if (error) {
-console.error("商品削除エラー:", error);
-alert("商品を削除できませんでした。");
-return;
+  console.error("商品削除エラー:", error);
+  alert("商品を削除できませんでした。");
+  return;
 }
 
 await loadProducts();
+
 }
 
 return (
-<main className="min-h-screen bg-gray-50 p-6">
+<main className="min-h-screen bg-gray-50 p-6 text-gray-900">
 <div className="mx-auto max-w-5xl">
 <div className="mb-8">
-<h1 className="text-3xl font-bold">
+<h1 className="text-3xl font-black text-gray-900">
 商品管理
 </h1>
 
-      <p className="mt-2 text-gray-500">
+      <p className="mt-2 text-base font-medium text-gray-700">
         注文画面で使用する商品を管理します。
       </p>
     </div>
 
     <section className="mb-8 rounded-2xl bg-white p-6 shadow-sm">
-      <h2 className="mb-4 text-xl font-bold">
+      <h2 className="mb-4 text-xl font-black text-gray-900">
         商品を追加
       </h2>
 
@@ -193,7 +192,7 @@ return (
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="商品名"
-          className="rounded-xl border px-4 py-3 outline-none focus:border-black"
+          className="rounded-xl border border-gray-300 px-4 py-3 text-base font-medium text-gray-900 outline-none placeholder:text-gray-500 focus:border-black"
         />
 
         <input
@@ -203,7 +202,7 @@ return (
           placeholder="価格"
           min="0"
           step="1"
-          className="rounded-xl border px-4 py-3 outline-none focus:border-black"
+          className="rounded-xl border border-gray-300 px-4 py-3 text-base font-medium text-gray-900 outline-none placeholder:text-gray-500 focus:border-black"
         />
 
         <button
@@ -219,21 +218,21 @@ return (
 
     <section className="rounded-2xl bg-white p-6 shadow-sm">
       <div className="mb-5 flex items-center justify-between">
-        <h2 className="text-xl font-bold">
+        <h2 className="text-xl font-black text-gray-900">
           商品一覧
         </h2>
 
-        <span className="rounded-full bg-gray-100 px-4 py-2 text-sm font-bold">
+        <span className="rounded-full bg-gray-100 px-4 py-2 text-sm font-bold text-gray-900">
           {products.length}件
         </span>
       </div>
 
       {loading ? (
-        <div className="py-10 text-center text-gray-400">
+        <div className="py-10 text-center text-base font-bold text-gray-700">
           読み込み中...
         </div>
       ) : products.length === 0 ? (
-        <div className="rounded-xl bg-gray-50 p-10 text-center text-gray-400">
+        <div className="rounded-xl bg-gray-50 p-10 text-center text-base font-bold text-gray-700">
           商品が登録されていません。
         </div>
       ) : (
@@ -241,19 +240,19 @@ return (
           {products.map((product) => (
             <div
               key={product.id}
-              className="flex flex-col gap-4 rounded-xl border p-4 md:flex-row md:items-center md:justify-between"
+              className="flex flex-col gap-4 rounded-xl border border-gray-300 p-4 md:flex-row md:items-center md:justify-between"
             >
               <div>
                 <div className="flex items-center gap-3">
-                  <h3 className="text-lg font-bold">
+                  <h3 className="text-lg font-black text-gray-900">
                     {product.name}
                   </h3>
 
                   <span
-                    className={`rounded-full px-3 py-1 text-xs font-bold ${
+                    className={`rounded-full px-3 py-1 text-xs font-black ${
                       product.is_active
-                        ? "bg-green-100 text-green-700"
-                        : "bg-gray-200 text-gray-500"
+                        ? "bg-green-100 text-green-800"
+                        : "bg-gray-200 text-gray-700"
                     }`}
                   >
                     {product.is_active
@@ -262,7 +261,7 @@ return (
                   </span>
                 </div>
 
-                <p className="mt-1 text-lg">
+                <p className="mt-1 text-lg font-bold text-gray-900">
                   ¥{product.price.toLocaleString("ja-JP")}
                 </p>
               </div>
@@ -271,7 +270,7 @@ return (
                 <button
                   type="button"
                   onClick={() => editProduct(product)}
-                  className="rounded-lg border px-4 py-2 font-bold"
+                  className="rounded-lg border border-gray-400 bg-white px-4 py-2 font-bold text-gray-900 hover:bg-gray-100"
                 >
                   編集
                 </button>
@@ -279,7 +278,7 @@ return (
                 <button
                   type="button"
                   onClick={() => toggleProduct(product)}
-                  className="rounded-lg border px-4 py-2 font-bold"
+                  className="rounded-lg border border-gray-400 bg-white px-4 py-2 font-bold text-gray-900 hover:bg-gray-100"
                 >
                   {product.is_active
                     ? "販売停止"
@@ -289,7 +288,7 @@ return (
                 <button
                   type="button"
                   onClick={() => deleteProduct(product)}
-                  className="rounded-lg border border-red-200 px-4 py-2 font-bold text-red-600"
+                  className="rounded-lg border border-red-300 bg-white px-4 py-2 font-bold text-red-700 hover:bg-red-50"
                 >
                   削除
                 </button>
