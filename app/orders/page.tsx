@@ -41,19 +41,6 @@ orderCount: number;
 sales: number;
 };
 
-type FinanceSettings = {
-id: number;
-initial_funds: number;
-material_cost: number;
-};
-
-type MaterialCostItem = {
-id: string;
-name: string;
-amount: number;
-created_at: string;
-};
-
 function statusLabel(status: OrderStatus) {
 switch (status) {
 case "new":
@@ -133,18 +120,9 @@ export default function OrdersPage() {
 const [orders, setOrders] = useState<Order[]>([]);
 const [loading, setLoading] = useState(true);
 const [selectedDate, setSelectedDate] = useState("");
-const [deletingOrderId, setDeletingOrderId] = useState<string | null>(null);
-
-const [initialFunds, setInitialFunds] = useState(0);
-const [materialCost, setMaterialCost] = useState(0);
-const [initialFundsInput, setInitialFundsInput] = useState("");
-const [materialCostInput, setMaterialCostInput] = useState("");
-const [savingFinance, setSavingFinance] = useState(false);
-const [materialCostItems, setMaterialCostItems] = useState<MaterialCostItem[]>([]);
-const [materialNameInput, setMaterialNameInput] = useState("");
-const [materialAmountInput, setMaterialAmountInput] = useState("");
-const [editingMaterialId, setEditingMaterialId] = useState<string | null>(null);
-const [savingMaterial, setSavingMaterial] = useState(false);
+const [deletingOrderId, setDeletingOrderId] = useState<string | null>(
+null
+);
 
 const loadOrders = useCallback(async () => {
 setLoading(true);
@@ -167,182 +145,13 @@ setLoading(false);
 
 }, []);
 
-const loadFinanceSettings = useCallback(async () => {
-const { data, error } = await supabase
-.from("finance_settings")
-.select("id, initial_funds, material_cost")
-.eq("id", 1)
-.maybeSingle();
-
-if (error) {
-  console.error("資金設定取得エラー:", error);
-  return;
-}
-
-if (data) {
-  const settings = data as FinanceSettings;
-
-  setInitialFunds(settings.initial_funds);
-  setMaterialCost(settings.material_cost);
-  setInitialFundsInput(String(settings.initial_funds));
-  setMaterialCostInput(String(settings.material_cost));
-}
-
-}, []);
-
-const loadMaterialCostItems = useCallback(async () => {
-const { data, error } = await supabase
-.from("material_cost_items")
-.select("id, name, amount, created_at")
-.order("created_at", { ascending: true });
-
-if (error) {
-console.error("材料費内訳取得エラー:", error);
-return;
-}
-
-const items = (data ?? []) as MaterialCostItem[];
-setMaterialCostItems(items);
-
-const total = items.reduce((sum, item) => sum + item.amount, 0);
-setMaterialCost(total);
-setMaterialCostInput(String(total));
-}, []);
-
 useEffect(() => {
 setSelectedDate(getTodayKey());
 }, []);
 
 useEffect(() => {
 loadOrders();
-loadFinanceSettings();
-loadMaterialCostItems();
-}, [loadOrders, loadFinanceSettings, loadMaterialCostItems]);
-
-async function saveFinanceSettings() {
-const nextInitialFunds = Number(initialFundsInput);
-const nextMaterialCost = Number(materialCostInput);
-
-if (
-  !Number.isInteger(nextInitialFunds) ||
-  nextInitialFunds < 0
-) {
-  window.alert("もともとの資金は0円以上の整数で入力してください。");
-  return;
-}
-
-if (
-  !Number.isInteger(nextMaterialCost) ||
-  nextMaterialCost < 0
-) {
-  window.alert("材料費は0円以上の整数で入力してください。");
-  return;
-}
-
-setSavingFinance(true);
-
-const { error } = await supabase
-  .from("finance_settings")
-  .update({
-    initial_funds: nextInitialFunds,
-    material_cost: nextMaterialCost,
-    updated_at: new Date().toISOString(),
-  })
-  .eq("id", 1);
-
-if (error) {
-  console.error("資金設定保存エラー:", error);
-  window.alert("資金設定を保存できませんでした。");
-  setSavingFinance(false);
-  return;
-}
-
-setInitialFunds(nextInitialFunds);
-setMaterialCost(nextMaterialCost);
-setSavingFinance(false);
-
-window.alert("資金設定を保存しました。");
-
-}
-
-async function saveMaterialCostItem() {
-const name = materialNameInput.trim();
-const amount = Number(materialAmountInput);
-
-if (!name) {
-window.alert("材料名を入力してください。");
-return;
-}
-
-if (!Number.isInteger(amount) || amount < 0) {
-window.alert("材料費は0円以上の整数で入力してください。");
-return;
-}
-
-setSavingMaterial(true);
-
-if (editingMaterialId) {
-const { error } = await supabase
-.from("material_cost_items")
-.update({ name, amount })
-.eq("id", editingMaterialId);
-
-if (error) {
-console.error("材料費内訳更新エラー:", error);
-window.alert("材料費内訳を更新できませんでした。");
-setSavingMaterial(false);
-return;
-}
-} else {
-const { error } = await supabase
-.from("material_cost_items")
-.insert({ name, amount });
-
-if (error) {
-console.error("材料費内訳登録エラー:", error);
-window.alert("材料費内訳を登録できませんでした。");
-setSavingMaterial(false);
-return;
-}
-}
-
-setMaterialNameInput("");
-setMaterialAmountInput("");
-setEditingMaterialId(null);
-setSavingMaterial(false);
-await loadMaterialCostItems();
-}
-
-function startEditMaterial(item: MaterialCostItem) {
-setEditingMaterialId(item.id);
-setMaterialNameInput(item.name);
-setMaterialAmountInput(String(item.amount));
-}
-
-function cancelEditMaterial() {
-setEditingMaterialId(null);
-setMaterialNameInput("");
-setMaterialAmountInput("");
-}
-
-async function deleteMaterialCostItem(item: MaterialCostItem) {
-const confirmed = window.confirm(item.name + " の材料費内訳を削除しますか？");
-if (!confirmed) return;
-
-const { error } = await supabase
-.from("material_cost_items")
-.delete()
-.eq("id", item.id);
-
-if (error) {
-console.error("材料費内訳削除エラー:", error);
-window.alert("材料費内訳を削除できませんでした。");
-return;
-}
-
-if (editingMaterialId === item.id) cancelEditMaterial();
-await loadMaterialCostItems();
-}
+}, [loadOrders]);
 
 async function handleDeleteOrder(orderId: string) {
 const targetOrder = orders.find((order) => order.id === orderId);
@@ -407,27 +216,6 @@ selectedDateSales / validSelectedDateOrders.length
 )
 : 0;
 
-const allValidOrders = orders.filter(
-(order) => order.status !== "cancelled"
-);
-
-const totalSales = allValidOrders.reduce(
-(sum, order) => sum + order.total_price,
-0
-);
-
-const increasedFunds = totalSales - materialCost;
-const currentFunds = initialFunds + increasedFunds;
-
-const maxFinanceValue = Math.max(
-initialFunds,
-materialCost,
-totalSales,
-Math.abs(increasedFunds),
-Math.abs(currentFunds),
-1
-);
-
 const productSalesMap: Record<string, ProductSales> = {};
 
 validSelectedDateOrders.forEach((order) => {
@@ -454,7 +242,8 @@ const productSales = Object.values(productSalesMap).sort(
 const staffSalesMap: Record<string, StaffSales> = {};
 
 validSelectedDateOrders.forEach((order) => {
-const staffName = order.staff_name?.trim() || "スタッフ未設定";
+const staffName =
+order.staff_name?.trim() || "スタッフ未設定";
 
 if (!staffSalesMap[staffName]) {
   staffSalesMap[staffName] = {
@@ -489,10 +278,7 @@ return (
 
       <button
         type="button"
-        onClick={() => {
-          loadOrders();
-          loadFinanceSettings();
-        }}
+        onClick={loadOrders}
         className="rounded-xl bg-slate-900 px-5 py-3 font-black text-white hover:bg-slate-800"
       >
         更新
@@ -514,201 +300,13 @@ return (
         <input
           type="date"
           value={selectedDate}
-          onChange={(event) => setSelectedDate(event.target.value)}
+          onChange={(event) =>
+            setSelectedDate(event.target.value)
+          }
           className="rounded-xl border-2 border-slate-300 bg-white px-4 py-3 text-lg font-black text-slate-900 outline-none focus:border-slate-900"
         />
       </div>
     </div>
-
-    <section className="mb-6 overflow-hidden rounded-2xl bg-white shadow-sm">
-      <div className="border-b border-slate-200 bg-slate-900 px-5 py-5">
-        <h2 className="text-2xl font-black text-white">
-          資金管理
-        </h2>
-
-        <p className="mt-1 text-sm font-medium text-slate-300">
-          売上は注文履歴から自動集計し、材料費は合計金額で管理します。
-        </p>
-      </div>
-
-      <div className="p-5">
-<div className="mb-4 rounded-2xl bg-slate-50 p-5">
-<label className="block">
-<span className="font-black text-slate-800">もともとの資金</span>
-<span className="mt-1 block text-sm font-medium text-slate-500">開始時に持っていた資金</span>
-<div className="mt-3 flex items-center gap-2">
-<span className="text-xl font-black text-slate-700">¥</span>
-<input type="number" min="0" step="1" value={initialFundsInput} onChange={(event) => setInitialFundsInput(event.target.value)} className="w-full rounded-xl border-2 border-slate-300 bg-white px-4 py-3 text-xl font-black text-slate-900 outline-none focus:border-slate-900" />
-</div>
-</label>
-</div>
-
-<div className="rounded-2xl border-2 border-slate-200 bg-white p-5">
-<div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-<div>
-<h3 className="text-xl font-black text-slate-900">材料費の内訳</h3>
-<p className="mt-1 text-sm font-medium text-slate-500">材料ごとの金額を登録すると、材料費合計が自動計算されます。</p>
-</div>
-<p className="text-2xl font-black text-red-600">合計 ¥{materialCost.toLocaleString("ja-JP")}</p>
-</div>
-
-<div className="mt-5 grid gap-3 md:grid-cols-[1fr_220px_auto_auto]">
-<input type="text" value={materialNameInput} onChange={(event) => setMaterialNameInput(event.target.value)} placeholder="材料名 例：麺" className="rounded-xl border-2 border-slate-300 px-4 py-3 font-bold text-slate-900 outline-none focus:border-slate-900" />
-<div className="flex items-center gap-2">
-<span className="font-black text-slate-700">¥</span>
-<input type="number" min="0" step="1" value={materialAmountInput} onChange={(event) => setMaterialAmountInput(event.target.value)} placeholder="金額" className="w-full rounded-xl border-2 border-slate-300 px-4 py-3 font-bold text-slate-900 outline-none focus:border-slate-900" />
-</div>
-<button type="button" onClick={saveMaterialCostItem} disabled={savingMaterial} className="rounded-xl bg-blue-600 px-5 py-3 font-black text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300">{savingMaterial ? "保存中..." : editingMaterialId ? "更新" : "追加"}</button>
-{editingMaterialId ? <button type="button" onClick={cancelEditMaterial} disabled={savingMaterial} className="rounded-xl bg-slate-200 px-5 py-3 font-black text-slate-800 hover:bg-slate-300">キャンセル</button> : <div />}
-</div>
-
-<div className="mt-5 overflow-hidden rounded-xl border border-slate-200">
-{materialCostItems.length === 0 ? (
-<div className="p-6 text-center"><p className="font-bold text-slate-500">材料費の内訳はまだ登録されていません</p></div>
-) : (
-<div className="divide-y divide-slate-200">
-{materialCostItems.map((item) => (
-<div key={item.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
-<p className="text-lg font-black text-slate-900">{item.name}</p>
-<div className="flex flex-wrap items-center gap-2">
-<p className="mr-2 text-lg font-black text-slate-900">¥{item.amount.toLocaleString("ja-JP")}</p>
-<button type="button" onClick={() => startEditMaterial(item)} className="rounded-lg bg-slate-200 px-3 py-2 text-sm font-black text-slate-800 hover:bg-slate-300">編集</button>
-<button type="button" onClick={() => deleteMaterialCostItem(item)} className="rounded-lg bg-red-100 px-3 py-2 text-sm font-black text-red-700 hover:bg-red-200">削除</button>
-</div>
-</div>
-))}
-</div>
-)}
-</div>
-</div>
-</div>
-<div className="px-5 pb-5">
-        <button
-          type="button"
-          onClick={saveFinanceSettings}
-          disabled={savingFinance}
-          className="w-full rounded-xl bg-blue-600 px-5 py-4 font-black text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
-        >
-          {savingFinance ? "保存中..." : "もともとの資金を保存"}
-        </button>
-      </div>
-
-      <div className="grid gap-4 border-t border-slate-200 p-5 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-2xl bg-slate-50 p-5">
-          <p className="font-bold text-slate-600">
-            もともとの資金
-          </p>
-
-          <p className="mt-2 text-3xl font-black text-slate-900">
-            ¥{initialFunds.toLocaleString("ja-JP")}
-          </p>
-        </div>
-
-        <div className="rounded-2xl bg-slate-50 p-5">
-          <p className="font-bold text-slate-600">
-            累計売上
-          </p>
-
-          <p className="mt-2 text-3xl font-black text-slate-900">
-            ¥{totalSales.toLocaleString("ja-JP")}
-          </p>
-
-          <p className="mt-1 text-xs font-bold text-slate-500">
-            取消注文を除く
-          </p>
-        </div>
-
-        <div className="rounded-2xl bg-slate-50 p-5">
-          <p className="font-bold text-slate-600">
-            材料費
-          </p>
-
-          <p className="mt-2 text-3xl font-black text-red-600">
-            -¥{materialCost.toLocaleString("ja-JP")}
-          </p>
-        </div>
-
-        <div className="rounded-2xl bg-green-50 p-5">
-          <p className="font-bold text-green-700">
-            増えた金額
-          </p>
-
-          <p
-            className={
-              "mt-2 text-3xl font-black " +
-              (increasedFunds >= 0
-                ? "text-green-700"
-                : "text-red-600")
-            }
-          >
-            {increasedFunds >= 0 ? "+" : "-"}¥
-            {Math.abs(increasedFunds).toLocaleString("ja-JP")}
-          </p>
-        </div>
-      </div>
-
-      <div className="border-t border-slate-200 bg-slate-50 p-5">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="font-bold text-slate-600">
-              現在の資金
-            </p>
-
-            <p className="mt-1 text-sm font-medium text-slate-500">
-              もともとの資金 ＋ 売上 − 材料費
-            </p>
-          </div>
-
-          <p
-            className={
-              "text-4xl font-black " +
-              (currentFunds >= 0
-                ? "text-slate-900"
-                : "text-red-600")
-            }
-          >
-            ¥{currentFunds.toLocaleString("ja-JP")}
-          </p>
-        </div>
-
-        <div className="mt-5">
-          <div className="mb-2 flex justify-between text-sm font-bold text-slate-600">
-            <span>資金の変化</span>
-            <span>
-              {currentFunds >= initialFunds ? "増加" : "減少"}
-            </span>
-          </div>
-
-          <div className="h-8 overflow-hidden rounded-full bg-slate-200">
-            <div
-              className="h-full rounded-full bg-green-500 transition-all"
-              style={{
-                width:
-                  currentFunds > 0
-                    ? Math.min(
-                        100,
-                        Math.max(
-                          5,
-                          (currentFunds / maxFinanceValue) * 100
-                        )
-                      ) + "%"
-                    : "0%",
-              }}
-            />
-          </div>
-
-          <div className="mt-2 flex justify-between text-xs font-bold text-slate-500">
-            <span>
-              開始 ¥{initialFunds.toLocaleString("ja-JP")}
-            </span>
-
-            <span>
-              現在 ¥{currentFunds.toLocaleString("ja-JP")}
-            </span>
-          </div>
-        </div>
-      </div>
-    </section>
 
     <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <div className="rounded-2xl bg-white p-6 shadow-sm">
@@ -878,10 +476,7 @@ return (
 
         <div className="divide-y divide-slate-200">
           {selectedDateOrders.map((order) => (
-            <div
-              key={order.id}
-              className="p-5"
-            >
+            <div key={order.id} className="p-5">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div className="flex flex-wrap items-start gap-5">
                   <div>
@@ -937,7 +532,9 @@ return (
 
                   <button
                     type="button"
-                    onClick={() => handleDeleteOrder(order.id)}
+                    onClick={() =>
+                      handleDeleteOrder(order.id)
+                    }
                     disabled={deletingOrderId === order.id}
                     className="rounded-xl bg-red-600 px-4 py-2 font-black text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-red-300"
                   >
