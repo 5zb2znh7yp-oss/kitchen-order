@@ -32,6 +32,7 @@ const [loading, setLoading] = useState(true);
 const [ordering, setOrdering] = useState(false);
 const [errorMessage, setErrorMessage] = useState("");
 const [orderNumber, setOrderNumber] = useState<number | null>(null);
+const [thankYou, setThankYou] = useState(false);
 
 useEffect(() => {
 loadData();
@@ -45,6 +46,23 @@ return () => {
 };
 
 }, []);
+
+useEffect(() => {
+if (orderNumber === null || thankYou) {
+return;
+}
+
+const timer = window.setInterval(() => {
+  checkPaymentStatus(orderNumber);
+}, 3000);
+
+checkPaymentStatus(orderNumber);
+
+return () => {
+  window.clearInterval(timer);
+};
+
+}, [orderNumber, thankYou]);
 
 async function loadData() {
 setLoading(true);
@@ -94,8 +112,27 @@ if (data) {
 
 }
 
+async function checkPaymentStatus(number: number) {
+const { data, error } = await supabase
+.from("orders")
+.select("payment_status, status")
+.eq("order_number", number)
+.eq("order_source", "mobile")
+.maybeSingle();
+
+if (error) {
+  console.error("支払い状態確認エラー:", error);
+  return;
+}
+
+if (data?.payment_status === "paid") {
+  setThankYou(true);
+}
+
+}
+
 function addToCart(product: Product) {
-if (!isOpen || ordering) {
+if (!isOpen || ordering || thankYou) {
 return;
 }
 
@@ -131,7 +168,7 @@ setCart((currentCart) => {
 }
 
 function changeQuantity(productId: string, amount: number) {
-if (!isOpen || ordering) {
+if (!isOpen || ordering || thankYou) {
 return;
 }
 
@@ -156,7 +193,7 @@ const total = cart.reduce(
 );
 
 async function submitOrder() {
-if (ordering) {
+if (ordering || thankYou) {
 return;
 }
 
@@ -250,6 +287,35 @@ try {
 
 }
 
+if (thankYou) {
+return (
+<main className="min-h-screen bg-slate-950 p-4">
+<div className="mx-auto flex min-h-screen max-w-lg items-center justify-center">
+<div className="w-full rounded-3xl bg-white p-8 text-center shadow-2xl">
+<div className="mx-auto flex h-24 w-24 items-center justify-center rounded-full bg-green-100">
+<span className="text-5xl font-black text-green-700">
+✓
+</span>
+</div>
+
+        <h1 className="mt-8 text-4xl font-black leading-tight text-slate-950">
+          お買い上げ
+          <br />
+          ありがとうございました。
+        </h1>
+
+        <p className="mt-6 text-lg font-bold leading-8 text-slate-600">
+          商品のお受け取りありがとうございました。
+          <br />
+          またのご来店をお待ちしております。
+        </p>
+      </div>
+    </div>
+  </main>
+);
+
+}
+
 if (orderNumber !== null) {
 return (
 <main className="min-h-screen bg-slate-100 p-4">
@@ -295,6 +361,10 @@ return (
 
         <p className="mt-6 text-sm font-bold text-slate-500">
           この画面は注文確認用です。整理番号をお控えください。
+        </p>
+
+        <p className="mt-4 text-sm font-bold text-slate-400">
+          お支払い・商品受け取り後、自動で完了画面に切り替わります。
         </p>
       </div>
     </div>
