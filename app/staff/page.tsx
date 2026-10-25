@@ -1,7 +1,6 @@
 ﻿"use client";
 
 import { useEffect, useState } from "react";
-
 import { supabase } from "@/lib/supabase";
 
 type StaffProfile = {
@@ -77,10 +76,37 @@ const currentStaff = staffList.find(
 
 const isOwner = currentStaff?.is_owner === true;
 
-function switchStaff(staff: StaffProfile) {
+async function switchStaff(staff: StaffProfile) {
+if (staff.is_owner) {
+const pin = window.prompt("主PINを入力してください。");
+
+  if (pin === null) {
+    return;
+  }
+
+  const { data, error } = await supabase.rpc(
+    "login_as_owner",
+    {
+      input_pin: pin,
+      target_staff_id: staff.id,
+    }
+  );
+
+  if (error) {
+    console.error("主ログイン確認エラー:", error);
+    window.alert("主への切り替えに失敗しました。");
+    return;
+  }
+
+  if (data !== true) {
+    window.alert("主PINが正しくありません。");
+    return;
+  }
+}
+
 const staffData = {
-id: staff.id,
-displayName: staff.display_name,
+  id: staff.id,
+  displayName: staff.display_name,
 };
 
 localStorage.setItem(
@@ -124,7 +150,7 @@ setSaving(false);
 await loadStaff();
 
 if (!loggedInStaff && data) {
-  switchStaff(data as StaffProfile);
+  await switchStaff(data as StaffProfile);
   return;
 }
 
@@ -320,7 +346,9 @@ if (error) {
 }
 
 if (data !== true) {
-  window.alert("PINが正しくないか、削除できないスタッフです。");
+  window.alert(
+    "PINが正しくないか、削除できないスタッフです。"
+  );
   return;
 }
 
@@ -472,7 +500,9 @@ return (
                 onClick={() => switchStaff(staff)}
                 className="rounded-xl bg-slate-900 px-4 py-3 font-black text-white hover:bg-slate-700"
               >
-                このスタッフに切替
+                {staff.is_owner
+                  ? "主として切替"
+                  : "このスタッフに切替"}
               </button>
 
               <button
