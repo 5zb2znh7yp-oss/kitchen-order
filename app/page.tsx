@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+
 import { supabase } from "@/lib/supabase";
 
 type Product = {
@@ -22,6 +23,13 @@ id: string;
 display_name: string;
 };
 
+type BusinessStatus = {
+id: number;
+is_open: boolean;
+opened_at: string | null;
+closed_at: string | null;
+};
+
 export default function Home() {
 const [products, setProducts] = useState<Product[]>([]);
 const [staff, setStaff] = useState<Staff[]>([]);
@@ -30,7 +38,10 @@ const [cart, setCart] = useState<CartItem[]>([]);
 const [cashReceived, setCashReceived] = useState("");
 const [loading, setLoading] = useState(true);
 const [checkingOut, setCheckingOut] = useState(false);
+const [changingBusinessStatus, setChangingBusinessStatus] = useState(false);
+const [isOpen, setIsOpen] = useState(false);
 const [errorMessage, setErrorMessage] = useState("");
+
 const [receipt, setReceipt] = useState<{
 orderNumber: number;
 total: number;
@@ -42,6 +53,7 @@ staffName: string;
 useEffect(() => {
 loadProducts();
 loadStaff();
+loadBusinessStatus();
 
 const savedStaff = localStorage.getItem("kitchen-order-staff");
 
@@ -57,9 +69,18 @@ if (savedStaff) {
       "保存されたスタッフ情報の読み込みに失敗しました:",
       error
     );
+
     localStorage.removeItem("kitchen-order-staff");
   }
 }
+
+const interval = window.setInterval(() => {
+  loadBusinessStatus();
+}, 5000);
+
+return () => {
+  window.clearInterval(interval);
+};
 
 }, []);
 
@@ -74,9 +95,11 @@ const { data, error } = await supabase
 
 if (error) {
   console.error("商品取得エラー:", error);
+
   setErrorMessage(
     "商品を取得できませんでした。通信状態を確認して、ページを再読み込みしてください。"
   );
+
   setLoading(false);
   return;
 }
@@ -94,9 +117,11 @@ const { data, error } = await supabase
 
 if (error) {
   console.error("スタッフ取得エラー:", error);
+
   setErrorMessage(
     "スタッフを取得できませんでした。スタッフ登録を確認してください。"
   );
+
   return;
 }
 
@@ -104,8 +129,77 @@ setStaff(data ?? []);
 
 }
 
+async function loadBusinessStatus() {
+const { data, error } = await supabase
+.from("business_status")
+.select("id, is_open, opened_at, closed_at")
+.eq("id", 1)
+.maybeSingle();
+
+if (error) {
+  console.error("営業状態取得エラー:", error);
+  return;
+}
+
+if (data) {
+  const status = data as BusinessStatus;
+  setIsOpen(status.is_open);
+}
+
+}
+
+async function changeBusinessStatus(nextIsOpen: boolean) {
+if (changingBusinessStatus) {
+return;
+}
+
+setErrorMessage("");
+setChangingBusinessStatus(true);
+
+const now = new Date().toISOString();
+
+const updateData = nextIsOpen
+  ? {
+      is_open: true,
+      opened_at: now,
+      closed_at: null,
+      updated_at: now,
+    }
+  : {
+      is_open: false,
+      closed_at: now,
+      updated_at: now,
+    };
+
+const { error } = await supabase
+  .from("business_status")
+  .update(updateData)
+  .eq("id", 1);
+
+if (error) {
+  console.error("営業状態変更エラー:", error);
+
+  setErrorMessage(
+    "注文受付の状態を変更できませんでした。通信状態を確認してください。"
+  );
+
+  setChangingBusinessStatus(false);
+  return;
+}
+
+setIsOpen(nextIsOpen);
+
+if (!nextIsOpen) {
+  setCart([]);
+  setCashReceived("");
+}
+
+setChangingBusinessStatus(false);
+
+}
+
 function addProduct(product: Product) {
-if (checkingOut) {
+if (checkingOut || !isOpen) {
 return;
 }
 
@@ -141,7 +235,7 @@ setCart((current) => {
 }
 
 function increaseQuantity(productId: string) {
-if (checkingOut) {
+if (checkingOut || !isOpen) {
 return;
 }
 
@@ -161,7 +255,7 @@ setCart((current) =>
 }
 
 function decreaseQuantity(productId: string) {
-if (checkingOut) {
+if (checkingOut || !isOpen) {
 return;
 }
 
@@ -183,7 +277,7 @@ setCart((current) =>
 }
 
 function clearCart() {
-if (checkingOut) {
+if (checkingOut || !isOpen) {
 return;
 }
 
@@ -208,6 +302,11 @@ return;
 
 setErrorMessage("");
 
+if (!isOpen) {
+  setErrorMessage("現在、注文受付を終了しています。");
+  return;
+}
+
 if (!selectedStaffName) {
   setErrorMessage("担当スタッフを選択してください。");
   return;
@@ -226,14 +325,44 @@ if (cash < total) {
 setCheckingOut(true);
 
 try {
+  const { data: currentStatus, error: statusError } = await supabase
+    .from("business_status")
+    .select("is_open")
+    .eq("id", 1)
+    .maybeSingle();
+
+  if (statusError) {
+    console.error("営業状態確認エラー:", statusError);
+
+    setErrorMessage(
+      "営業状態を確認できませんでした。もう一度お試しください。"
+    );
+
+    return;
+  }
+
+  if (!currentStatus?.is_open) {
+    setIsOpen(false);
+    setCart([]);
+    setCashReceived("");
+
+    setErrorMessage(
+      "注文受付が終了しました。今回の注文は登録されていません。"
+    );
+
+    return;
+  }
+
   const { data: orderNumber, error: numberError } =
     await supabase.rpc("next_order_number");
 
   if (numberError) {
     console.error("整理番号取得エラー:", numberError);
+
     setErrorMessage(
       "整理番号を取得できませんでした。通信状態を確認して、もう一度お試しください。"
     );
+
     return;
   }
 
@@ -258,9 +387,11 @@ try {
 
   if (insertError) {
     console.error("注文登録エラー:", insertError);
+
     setErrorMessage(
       "注文を登録できませんでした。注文は確定していません。通信状態を確認して、もう一度お試しください。"
     );
+
     return;
   }
 
@@ -276,6 +407,7 @@ try {
   setCashReceived("");
 } catch (error) {
   console.error("会計処理エラー:", error);
+
   setErrorMessage(
     "通信エラーが発生しました。注文は確定していません。もう一度お試しください。"
   );
@@ -376,14 +508,71 @@ return (
 <main className="min-h-screen bg-slate-100 p-3 sm:p-4 md:p-6">
 <div className="mx-auto max-w-[1600px]">
 <header className="mb-5 md:mb-6">
+<div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+<div>
 <h1 className="text-3xl font-black text-slate-950 md:text-4xl">
 注文入力
 </h1>
 
-      <p className="mt-1 text-base font-bold text-slate-700">
-        商品を選択して会計を行ってください。
-      </p>
+          <p className="mt-1 text-base font-bold text-slate-700">
+            商品を選択して会計を行ってください。
+          </p>
+        </div>
+
+        <div className="rounded-2xl bg-white p-4 shadow-sm">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div>
+              <p className="text-sm font-black text-slate-500">
+                注文受付状態
+              </p>
+
+              <p
+                className={
+                  "mt-1 text-xl font-black " +
+                  (isOpen
+                    ? "text-green-700"
+                    : "text-red-600")
+                }
+              >
+                {isOpen
+                  ? "🟢 注文受付中"
+                  : "🔴 注文受付終了"}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => changeBusinessStatus(!isOpen)}
+              disabled={changingBusinessStatus}
+              className={
+                "rounded-xl px-5 py-3 font-black text-white disabled:cursor-not-allowed disabled:opacity-50 " +
+                (isOpen
+                  ? "bg-red-600 hover:bg-red-700"
+                  : "bg-green-600 hover:bg-green-700")
+              }
+            >
+              {changingBusinessStatus
+                ? "変更中..."
+                : isOpen
+                  ? "注文受付を終了"
+                  : "注文受付を開始"}
+            </button>
+          </div>
+        </div>
+      </div>
     </header>
+
+    {!isOpen && (
+      <div className="mb-5 rounded-2xl border-2 border-red-200 bg-red-50 p-5 text-center">
+        <p className="text-xl font-black text-red-700">
+          現在、注文受付を終了しています
+        </p>
+
+        <p className="mt-1 font-bold text-red-600">
+          「注文受付を開始」を押すと注文できるようになります。
+        </p>
+      </div>
+    )}
 
     {errorMessage && (
       <div
@@ -424,7 +613,17 @@ return (
           </span>
         </div>
 
-        {loading ? (
+        {!isOpen ? (
+          <div className="rounded-2xl bg-white p-12 text-center shadow-sm">
+            <p className="text-xl font-black text-red-600">
+              注文受付終了中
+            </p>
+
+            <p className="mt-2 font-bold text-slate-600">
+              営業を開始すると商品を選択できます。
+            </p>
+          </div>
+        ) : loading ? (
           <div className="rounded-2xl bg-white p-12 text-center shadow-sm">
             <p className="text-lg font-bold text-slate-700">
               商品を読み込んでいます...
@@ -448,7 +647,7 @@ return (
                   key={product.id}
                   type="button"
                   onClick={() => addProduct(product)}
-                  disabled={checkingOut}
+                  disabled={checkingOut || !isOpen}
                   className={
                     "min-h-[170px] rounded-2xl border-2 bg-white p-6 text-left shadow-sm transition " +
                     "hover:border-blue-400 hover:shadow-md " +
@@ -505,7 +704,7 @@ return (
                 <button
                   type="button"
                   onClick={clearCart}
-                  disabled={checkingOut}
+                  disabled={checkingOut || !isOpen}
                   className="rounded-xl bg-slate-700 px-4 py-3 text-sm font-black text-white hover:bg-slate-600 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   クリア
@@ -530,7 +729,7 @@ return (
                   setSelectedStaffName(event.target.value);
                   setErrorMessage("");
                 }}
-                disabled={checkingOut}
+                disabled={checkingOut || !isOpen}
                 className="w-full rounded-2xl border-2 border-slate-300 bg-white px-4 py-4 text-lg font-black text-slate-950 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 disabled:bg-slate-100"
               >
                 <option value="">
@@ -551,7 +750,9 @@ return (
             {cart.length === 0 ? (
               <div className="rounded-2xl bg-slate-100 p-8 text-center md:p-10">
                 <p className="text-lg font-black text-slate-600">
-                  商品を選択してください
+                  {isOpen
+                    ? "商品を選択してください"
+                    : "注文受付終了中です"}
                 </p>
               </div>
             ) : (
@@ -581,7 +782,7 @@ return (
                           onClick={() =>
                             decreaseQuantity(item.productId)
                           }
-                          disabled={checkingOut}
+                          disabled={checkingOut || !isOpen}
                           className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-200 text-2xl font-black text-slate-900 hover:bg-slate-300 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           −
@@ -596,7 +797,7 @@ return (
                           onClick={() =>
                             increaseQuantity(item.productId)
                           }
-                          disabled={checkingOut}
+                          disabled={checkingOut || !isOpen}
                           className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-900 text-2xl font-black text-white hover:bg-slate-800 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           ＋
@@ -637,7 +838,7 @@ return (
                 onChange={(event) =>
                   setCashReceived(event.target.value)
                 }
-                disabled={checkingOut}
+                disabled={checkingOut || !isOpen}
                 placeholder="例：2000"
                 className="w-full rounded-2xl border-2 border-slate-300 bg-white px-5 py-5 text-2xl font-black text-slate-950 outline-none placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 disabled:bg-slate-100"
               />
@@ -674,6 +875,7 @@ return (
               onClick={checkout}
               disabled={
                 checkingOut ||
+                !isOpen ||
                 !selectedStaffName ||
                 cart.length === 0 ||
                 cash < total
