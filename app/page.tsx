@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
 import { supabase } from "@/lib/supabase";
 
 type Product = {
@@ -383,13 +382,15 @@ try {
       status: "new",
       items,
       staff_name: selectedStaffName,
+      order_source: "counter",
+      payment_status: "paid",
     });
 
   if (insertError) {
     console.error("注文登録エラー:", insertError);
 
     setErrorMessage(
-      "注文を登録できませんでした。注文は確定していません。通信状態を確認して、もう一度お試しください。"
+      "注文を登録できませんでした。注文は確定していません。もう一度お試しください。"
     );
 
     return;
