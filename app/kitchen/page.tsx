@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-
 import { supabase } from "@/lib/supabase";
 
 type OrderItem = {
@@ -18,6 +17,8 @@ type OrderStatus =
 | "completed"
 | "cancelled";
 
+type OrderSource = "counter" | "mobile";
+
 type Order = {
 id: string;
 order_number: number;
@@ -25,6 +26,7 @@ total_price: number;
 items: OrderItem[];
 status: OrderStatus;
 created_at: string;
+order_source: OrderSource;
 };
 
 function formatTime(dateString: string) {
@@ -42,7 +44,9 @@ const [updatingId, setUpdatingId] = useState<string | null>(null);
 const loadOrders = useCallback(async () => {
 const { data, error } = await supabase
 .from("orders")
-.select("id, order_number, total_price, items, status, created_at")
+.select(
+"id, order_number, total_price, items, status, created_at, order_source"
+)
 .in("status", ["new", "cooking", "ready"])
 .order("created_at", { ascending: true });
 
@@ -368,13 +372,27 @@ nextStatus: "new" | "cooking" | "ready" | "completed"
 ) => void;
 onCancel: (order: Order) => void;
 }) {
+const isMobileOrder = order.order_source === "mobile";
+
 return (
-<div className="rounded-3xl border-2 border-slate-200 bg-white p-5 shadow-sm md:p-6">
+<div
+className={
+isMobileOrder
+? "rounded-3xl border-4 border-yellow-300 bg-yellow-50 p-5 shadow-md md"
+: "rounded-3xl border-2 border-slate-200 bg-white p-5 shadow-sm md"
+}
+>
 <div className="flex items-start justify-between gap-4">
 <div>
-<p className="text-sm font-black text-slate-600 md:text-base">
-整理番号
-</p>
+{isMobileOrder ? (
+<span className="inline-flex rounded-full bg-yellow-400 px-4 py-2 text-sm font-black text-yellow-950">
+MOBILE
+</span>
+) : null}
+
+      <p className="mt-2 text-sm font-black text-slate-600 md:text-base">
+        整理番号
+      </p>
 
       <p className="mt-1 text-6xl font-black tracking-widest text-slate-950 md:text-7xl">
         {String(order.order_number).padStart(3, "0")}
@@ -392,9 +410,21 @@ return (
     </div>
   </div>
 
-  <div className="my-5 border-t-2 border-slate-100" />
+  <div
+    className={
+      isMobileOrder
+        ? "my-5 border-t-2 border-yellow-200"
+        : "my-5 border-t-2 border-slate-100"
+    }
+  />
 
-  <div className="rounded-2xl bg-slate-100 p-4 md:p-5">
+  <div
+    className={
+      isMobileOrder
+        ? "rounded-2xl bg-yellow-100 p-4 md:p-5"
+        : "rounded-2xl bg-slate-100 p-4 md:p-5"
+    }
+  >
     <p className="mb-4 text-sm font-black text-slate-600 md:text-base">
       注文内容
     </p>
@@ -427,6 +457,14 @@ return (
     </span>
   </div>
 
+  {isMobileOrder ? (
+    <div className="mt-4 rounded-2xl bg-yellow-200 px-4 py-3 text-center">
+      <p className="font-black text-yellow-950">
+        モバイル注文
+      </p>
+    </div>
+  ) : null}
+
   <button
     type="button"
     onClick={() => onUpdate(order.id, nextStatus)}
@@ -441,7 +479,7 @@ return (
       : buttonText}
   </button>
 
-  {backStatus && backButtonText && (
+  {backStatus && backButtonText ? (
     <button
       type="button"
       onClick={() => onUpdate(order.id, backStatus)}
@@ -452,7 +490,7 @@ return (
         ? "更新中..."
         : backButtonText}
     </button>
-  )}
+  ) : null}
 
   <button
     type="button"

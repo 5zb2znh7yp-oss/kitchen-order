@@ -120,9 +120,7 @@ export default function OrdersPage() {
 const [orders, setOrders] = useState<Order[]>([]);
 const [loading, setLoading] = useState(true);
 const [selectedDate, setSelectedDate] = useState("");
-const [deletingOrderId, setDeletingOrderId] = useState<string | null>(
-null
-);
+const [deletingOrderId, setDeletingOrderId] = useState<string | null>(null);
 
 const loadOrders = useCallback(async () => {
 setLoading(true);
@@ -242,8 +240,7 @@ const productSales = Object.values(productSalesMap).sort(
 const staffSalesMap: Record<string, StaffSales> = {};
 
 validSelectedDateOrders.forEach((order) => {
-const staffName =
-order.staff_name?.trim() || "スタッフ未設定";
+const staffName = order.staff_name?.trim() || "スタッフ未設定";
 
 if (!staffSalesMap[staffName]) {
   staffSalesMap[staffName] = {
@@ -300,9 +297,7 @@ return (
         <input
           type="date"
           value={selectedDate}
-          onChange={(event) =>
-            setSelectedDate(event.target.value)
-          }
+          onChange={(event) => setSelectedDate(event.target.value)}
           className="rounded-xl border-2 border-slate-300 bg-white px-4 py-3 text-lg font-black text-slate-900 outline-none focus:border-slate-900"
         />
       </div>
@@ -532,9 +527,7 @@ return (
 
                   <button
                     type="button"
-                    onClick={() =>
-                      handleDeleteOrder(order.id)
-                    }
+                    onClick={() => handleDeleteOrder(order.id)}
                     disabled={deletingOrderId === order.id}
                     className="rounded-xl bg-red-600 px-4 py-2 font-black text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-red-300"
                   >

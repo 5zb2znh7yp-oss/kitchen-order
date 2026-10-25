@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 
 const links = [
 { href: "/", label: "注文入力" },
+{ href: "/mobile-order", label: "モバイルオーダー" },
 { href: "/kitchen", label: "キッチン" },
 { href: "/call", label: "呼出画面" },
 { href: "/orders", label: "注文履歴・売上" },
