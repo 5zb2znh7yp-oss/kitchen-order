@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useEffect, useState } from "react";
+
 import { supabase } from "@/lib/supabase";
 
 type StaffProfile = {
@@ -19,9 +20,8 @@ export default function StaffPage() {
 const [staffList, setStaffList] = useState<StaffProfile[]>([]);
 const [displayNameInput, setDisplayNameInput] = useState("");
 const [selectedStaffId, setSelectedStaffId] = useState("");
-const [loggedInStaff, setLoggedInStaff] = useState<LoggedInStaff | null>(
-null
-);
+const [loggedInStaff, setLoggedInStaff] =
+useState<LoggedInStaff | null>(null);
 const [loading, setLoading] = useState(true);
 const [saving, setSaving] = useState(false);
 
@@ -55,7 +55,10 @@ if (savedStaff) {
       });
     }
   } catch (error) {
-    console.error("ログインスタッフ情報の読み込みに失敗しました:", error);
+    console.error(
+      "ログインスタッフ情報の読み込みに失敗しました:",
+      error
+    );
   }
 }
 
@@ -276,6 +279,64 @@ await loadStaff();
 
 }
 
+async function deleteStaff(staff: StaffProfile) {
+if (!isOwner) {
+window.alert("主だけがスタッフを削除できます。");
+return;
+}
+
+if (staff.is_owner) {
+  window.alert("主自身は削除できません。");
+  return;
+}
+
+const confirmed = window.confirm(
+  staff.display_name +
+    " さんをスタッフ一覧から削除しますか？"
+);
+
+if (!confirmed) {
+  return;
+}
+
+const pin = window.prompt("主PINを入力してください。");
+
+if (pin === null) {
+  return;
+}
+
+const { data, error } = await supabase.rpc(
+  "delete_staff",
+  {
+    input_pin: pin,
+    target_staff_id: staff.id,
+  }
+);
+
+if (error) {
+  console.error("スタッフ削除エラー:", error);
+  window.alert("スタッフを削除できませんでした。");
+  return;
+}
+
+if (data !== true) {
+  window.alert("PINが正しくないか、削除できないスタッフです。");
+  return;
+}
+
+await loadStaff();
+
+if (loggedInStaff?.id === staff.id) {
+  localStorage.removeItem("kitchen-order-staff");
+  setLoggedInStaff(null);
+}
+
+window.alert(
+  staff.display_name + " さんを削除しました。"
+);
+
+}
+
 if (loading) {
 return (
 <main className="min-h-screen bg-slate-100 text-slate-900">
@@ -295,10 +356,11 @@ return (
 <h1 className="text-3xl font-black text-slate-900">
 スタッフ管理
 </h1>
-<p className="mt-1 font-medium text-slate-600">
-スタッフの登録、名前変更、主・資金管理権限を管理します。
-</p>
-</div>
+
+      <p className="mt-1 font-medium text-slate-600">
+        スタッフの登録、名前変更、主・資金管理権限を管理します。
+      </p>
+    </div>
 
     <section className="mb-6 rounded-2xl bg-white p-5 shadow-sm">
       <h2 className="text-xl font-black text-slate-900">
@@ -310,6 +372,7 @@ return (
           <p className="text-sm font-bold text-slate-500">
             現在ログイン中
           </p>
+
           <p className="mt-1 text-2xl font-black text-slate-900">
             {loggedInStaff.displayName}
           </p>
@@ -438,6 +501,14 @@ return (
                     {staff.can_manage_finance
                       ? "資金管理をOFF"
                       : "資金管理をON"}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => deleteStaff(staff)}
+                    className="rounded-xl bg-red-100 px-4 py-3 font-black text-red-700 hover:bg-red-200"
+                  >
+                    削除
                   </button>
                 </>
               ) : null}
