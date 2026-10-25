@@ -43,7 +43,9 @@ setStaffList((data ?? []) as StaffProfile[]);
 
 useEffect(() => {
 const savedStaff = localStorage.getItem("kitchen-order-staff");
-const savedOwnerPin = sessionStorage.getItem("kitchen-order-owner-pin");
+const savedOwnerPin = sessionStorage.getItem(
+"kitchen-order-owner-pin"
+);
 
 if (savedStaff) {
   try {
@@ -535,6 +537,12 @@ return (
                     資金管理なし
                   </span>
                 )}
+
+                {staff.is_owner && isOwner && ownerPin ? (
+                  <span className="rounded-full bg-yellow-100 px-3 py-1 text-sm font-black text-yellow-700">
+                    主PIN：{ownerPin}
+                  </span>
+                ) : null}
               </div>
             </div>
 
