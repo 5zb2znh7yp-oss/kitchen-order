@@ -17,6 +17,10 @@ const links = [
 export default function Navbar() {
 const pathname = usePathname();
 
+if (pathname === "/mobile") {
+return null;
+}
+
 return (
 <nav className="border-b border-slate-200 bg-white">
 <div className="mx-auto flex max-w-7xl gap-2 overflow-x-auto px-4 py-3">
