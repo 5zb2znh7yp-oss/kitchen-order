@@ -21,6 +21,7 @@ const [displayNameInput, setDisplayNameInput] = useState("");
 const [selectedStaffId, setSelectedStaffId] = useState("");
 const [loggedInStaff, setLoggedInStaff] =
 useState<LoggedInStaff | null>(null);
+const [ownerPin, setOwnerPin] = useState("");
 const [loading, setLoading] = useState(true);
 const [saving, setSaving] = useState(false);
 
@@ -42,6 +43,7 @@ setStaffList((data ?? []) as StaffProfile[]);
 
 useEffect(() => {
 const savedStaff = localStorage.getItem("kitchen-order-staff");
+const savedOwnerPin = sessionStorage.getItem("kitchen-order-owner-pin");
 
 if (savedStaff) {
   try {
@@ -61,6 +63,10 @@ if (savedStaff) {
   }
 }
 
+if (savedOwnerPin) {
+  setOwnerPin(savedOwnerPin);
+}
+
 async function initialize() {
   await loadStaff();
   setLoading(false);
@@ -76,13 +82,24 @@ const currentStaff = staffList.find(
 
 const isOwner = currentStaff?.is_owner === true;
 
+useEffect(() => {
+if (!isOwner) {
+setOwnerPin("");
+sessionStorage.removeItem("kitchen-order-owner-pin");
+}
+}, [isOwner]);
+
 async function switchStaff(staff: StaffProfile) {
+let loginPin = "";
+
 if (staff.is_owner) {
-const pin = window.prompt("主PINを入力してください。");
+  const pin = window.prompt("主PINを入力してください。");
 
   if (pin === null) {
     return;
   }
+
+  loginPin = pin;
 
   const { data, error } = await supabase.rpc(
     "login_as_owner",
@@ -102,6 +119,13 @@ const pin = window.prompt("主PINを入力してください。");
     window.alert("主PINが正しくありません。");
     return;
   }
+
+  sessionStorage.setItem(
+    "kitchen-order-owner-pin",
+    loginPin
+  );
+} else {
+  sessionStorage.removeItem("kitchen-order-owner-pin");
 }
 
 const staffData = {
@@ -356,7 +380,9 @@ await loadStaff();
 
 if (loggedInStaff?.id === staff.id) {
   localStorage.removeItem("kitchen-order-staff");
+  sessionStorage.removeItem("kitchen-order-owner-pin");
   setLoggedInStaff(null);
+  setOwnerPin("");
 }
 
 window.alert(
@@ -406,9 +432,27 @@ return (
           </p>
 
           {isOwner ? (
-            <p className="mt-2 font-black text-blue-600">
-              主
-            </p>
+            <>
+              <p className="mt-2 font-black text-blue-600">
+                主
+              </p>
+
+              {ownerPin ? (
+                <div className="mt-4 rounded-xl border-2 border-blue-200 bg-blue-50 p-4">
+                  <p className="text-sm font-bold text-blue-700">
+                    現在の主PIN
+                  </p>
+
+                  <p className="mt-1 text-3xl font-black tracking-widest text-slate-900">
+                    {ownerPin}
+                  </p>
+
+                  <p className="mt-2 text-sm font-medium text-slate-600">
+                    このブラウザのセッション中だけ表示されます。
+                  </p>
+                </div>
+              ) : null}
+            </>
           ) : currentStaff?.can_manage_finance ? (
             <p className="mt-2 font-black text-green-600">
               資金管理権限あり
